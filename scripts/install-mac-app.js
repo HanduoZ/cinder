@@ -14,6 +14,7 @@ const resourcesDir = path.join(contentsDir, "Resources");
 const swiftPath = path.join(resourcesDir, "CinderApp.swift");
 const startHostPath = path.join(resourcesDir, "start-host.sh");
 const sourceIconPath = path.join(rootDir, "src/web/cinder-icon.png");
+const iconPngPath = path.join(resourcesDir, "CinderIcon.png");
 const iconPath = path.join(resourcesDir, "CinderIcon.icns");
 const iconTiffPath = path.join(resourcesDir, "CinderIcon.tiff");
 
@@ -36,9 +37,9 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleIdentifier</key>
   <string>life.cinder.local</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>0.1.1</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>0.1.1</string>
   <key>CFBundleExecutable</key>
   <string>Cinder</string>
   <key>CFBundleIconFile</key>
@@ -72,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.regular)
+    setAppIcon()
     createMenu()
     createWindow()
     log("app launched")
@@ -111,6 +113,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     mainMenu.addItem(editMenuItem)
 
     NSApp.mainMenu = mainMenu
+  }
+
+  private func setAppIcon() {
+    if let url = Bundle.main.url(forResource: "CinderIcon", withExtension: "png"),
+       let image = NSImage(contentsOf: url) {
+      NSApp.applicationIconImage = image
+    }
   }
 
   private func createWindow() {
@@ -286,6 +295,7 @@ fs.chmodSync(startHostPath, 0o755);
 fs.writeFileSync(swiftPath, swiftSource);
 
 if (fs.existsSync(sourceIconPath)) {
+  fs.copyFileSync(sourceIconPath, iconPngPath);
   const tiff = spawnSync("sips", ["-z", "1024", "1024", "-s", "format", "tiff", sourceIconPath, "--out", iconTiffPath], { stdio: "ignore" });
   if (tiff.status !== 0) throw new Error("Failed to prepare Cinder app icon.");
   const icns = spawnSync("/usr/bin/tiff2icns", [iconTiffPath, iconPath], { stdio: "inherit" });
