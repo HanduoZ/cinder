@@ -4,16 +4,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { startServer } from "../src/host/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
-const command = process.argv[2] || "help";
+const command = process.argv[2] || "host";
+const args = process.argv.slice(3);
 
 function printHelp() {
   console.log(`Cinder
 
 Usage:
-  cinder open            Open the desktop app
+  cinder                 Start Cinder on this Mac and open the local UI
+  cinder host            Start Cinder host
+  cinder host --lan      Start Cinder host on your LAN for iPhone/iPad
   cinder doctor          Check local setup
   cinder logs            Print local task database path
   cinder install-ponytail Install Ponytail for Claude Code and Codex
@@ -55,20 +59,47 @@ function doctor() {
   console.log(`Repo: ${rootDir}`);
   console.log(`${fs.existsSync(claudeSettings) ? "OK " : "NO "} Claude settings: ${claudeSettings}`);
   console.log(`${fs.existsSync(codexConfig) ? "OK " : "NO "} Codex config: ${codexConfig}`);
+  console.log("\nRun: cinder");
+  console.log("Phone/iPad on same Wi-Fi: cinder host --lan");
 
   if (!exists("claude") || !exists("codex")) {
     process.exitCode = 1;
   }
 }
 
-function openApp() {
-  const child = spawn("npm", ["start"], {
-    cwd: rootDir,
-    detached: true,
-    stdio: "ignore"
+function openUrl(url) {
+  if (process.platform === "darwin") {
+    spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+    return;
+  }
+  if (process.platform === "win32") {
+    spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" }).unref();
+    return;
+  }
+  spawn("xdg-open", [url], { detached: true, stdio: "ignore" }).unref();
+}
+
+async function host() {
+  const lan = args.includes("--lan");
+  const noOpen = args.includes("--no-open");
+  const portArg = args.find((arg) => arg.startsWith("--port="));
+  const port = portArg ? Number(portArg.split("=")[1]) : undefined;
+  const result = await startServer({
+    host: lan ? "0.0.0.0" : "127.0.0.1",
+    port
   });
-  child.unref();
-  console.log("Opening Cinder...");
+
+  console.log("Cinder is running\n");
+  console.log(`Local: ${result.localUrl}`);
+  if (lan) {
+    console.log(`Phone/iPad: ${result.lanUrl}`);
+  } else {
+    console.log("Phone/iPad: restart with `cinder host --lan` to allow same-Wi-Fi devices.");
+  }
+  console.log(`Data: ${result.dbPath}`);
+  console.log("\nPress Ctrl+C to stop Cinder.");
+
+  if (!noOpen) openUrl(result.localUrl);
 }
 
 function logs() {
@@ -96,8 +127,12 @@ switch (command) {
   case "doctor":
     doctor();
     break;
+  case "host":
   case "open":
-    openApp();
+    host().catch((error) => {
+      console.error(`Failed to start Cinder: ${error.message}`);
+      process.exitCode = 1;
+    });
     break;
   case "logs":
     logs();

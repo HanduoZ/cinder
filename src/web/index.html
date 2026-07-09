@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cinder</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app-shell">
@@ -21,7 +22,7 @@
       </header>
 
       <section class="stage">
-        <article id="card" class="review-card">
+        <article class="review-card">
           <div id="emptyState" class="empty-state">
             <h2>No cards to judge</h2>
             <p>Start a Claude Code or Codex task. Finished results will land here.</p>
@@ -142,6 +143,6 @@
       </form>
     </dialog>
 
-    <script src="./renderer.js"></script>
+    <script src="/app.js"></script>
   </body>
 </html>

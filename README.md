@@ -2,7 +2,7 @@
 
 Swipe through finished AI agent work.
 
-Cinder is a local desktop app for vibe coders who run many AI coding tasks in parallel. It turns finished Claude Code and Codex CLI runs into a single-card review flow:
+Cinder is a local-first agent work host for vibe coders who run many AI coding tasks in parallel. It turns finished Claude Code and Codex CLI runs into a single-card review flow:
 
 - Read the last request.
 - Read the agent's full final answer.
@@ -16,7 +16,7 @@ If a user gives you this repository and asks you to install Cinder:
 
 1. Run `./install.sh`.
 2. Run `cinder doctor`.
-3. If doctor passes, run `cinder open`.
+3. If doctor passes, run `cinder`.
 4. If Claude Code or Codex are missing, tell the user which one is missing.
 5. Do not edit shell startup files unless the user asks.
 
@@ -27,12 +27,20 @@ git clone https://github.com/HanduoZ/cinder.git
 cd cinder
 ./install.sh
 cinder doctor
-cinder open
+cinder
 ```
+
+To use Cinder from an iPhone or iPad on the same Wi-Fi:
+
+```sh
+cinder host --lan
+```
+
+Open the printed Phone/iPad URL on the device.
 
 ## Current MVP
 
-- Local Electron desktop app.
+- Local Mac host with browser/PWA UI.
 - Supports Claude Code and Codex CLI.
 - Starts new local CLI tasks.
 - Captures stdout and stderr.
@@ -40,11 +48,13 @@ cinder open
 - Supports Continue, Later, Done.
 - Stores local task history in `~/.cinder/tasks.json`.
 - Supports searching completed tasks and resuming from a completed task.
+- Does not require an account or Cinder server.
 
 ## CLI
 
 ```sh
 cinder open
+cinder host --lan
 cinder doctor
 cinder logs
 cinder install-ponytail

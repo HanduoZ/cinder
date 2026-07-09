@@ -2,8 +2,11 @@ const state = {
   tasks: [],
   current: null,
   selectedResumeTask: null,
-  logOpen: false
+  logOpen: false,
+  token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
 };
+
+if (state.token) window.localStorage.setItem("cinderToken", state.token);
 
 const els = {
   runningCount: document.getElementById("runningCount"),
@@ -29,6 +32,32 @@ const els = {
   closeDialogButton: document.getElementById("closeDialogButton"),
   searchInput: document.getElementById("searchInput"),
   searchResults: document.getElementById("searchResults")
+};
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...(state.token ? { "x-cinder-token": state.token } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Cinder request failed.");
+  return data;
+}
+
+const cinder = {
+  listTasks: () => api("/api/tasks"),
+  createTask: (input) => api("/api/tasks", { method: "POST", body: JSON.stringify(input) }),
+  continueTask: (taskId, prompt) =>
+    api(`/api/tasks/${encodeURIComponent(taskId)}/continue`, { method: "POST", body: JSON.stringify({ prompt }) }),
+  laterTask: (taskId) => api(`/api/tasks/${encodeURIComponent(taskId)}/later`, { method: "POST", body: "{}" }),
+  completeTask: (taskId) => api(`/api/tasks/${encodeURIComponent(taskId)}/complete`, { method: "POST", body: "{}" }),
+  searchTasks: (query) => api(`/api/tasks/search?q=${encodeURIComponent(query || "")}`),
+  resumeTask: (taskId, prompt) =>
+    api(`/api/tasks/${encodeURIComponent(taskId)}/resume`, { method: "POST", body: JSON.stringify({ prompt }) })
 };
 
 function reviewQueue() {
@@ -69,8 +98,15 @@ function render() {
 }
 
 async function refresh() {
-  state.tasks = await window.cinder.listTasks();
-  render();
+  try {
+    state.tasks = await cinder.listTasks();
+    render();
+  } catch (error) {
+    els.emptyState.classList.remove("hidden");
+    els.taskView.classList.add("hidden");
+    els.composer.classList.add("hidden");
+    els.emptyState.innerHTML = `<h2>Cannot connect to Cinder</h2><p>${escapeHtml(error.message)}</p>`;
+  }
 }
 
 function openNewTaskDialog() {
@@ -94,9 +130,9 @@ async function submitNewTask(event) {
   };
 
   if (state.selectedResumeTask) {
-    await window.cinder.resumeTask(state.selectedResumeTask.id, payload.prompt);
+    await cinder.resumeTask(state.selectedResumeTask.id, payload.prompt);
   } else {
-    await window.cinder.createTask(payload);
+    await cinder.createTask(payload);
   }
 
   els.newTaskDialog.close();
@@ -106,7 +142,7 @@ async function submitNewTask(event) {
 async function continueCurrent() {
   const prompt = els.continueInput.value.trim();
   if (!state.current || !prompt) return;
-  await window.cinder.continueTask(state.current.id, prompt);
+  await cinder.continueTask(state.current.id, prompt);
   els.continueInput.value = "";
   state.logOpen = false;
   await refresh();
@@ -114,20 +150,20 @@ async function continueCurrent() {
 
 async function laterCurrent() {
   if (!state.current) return;
-  await window.cinder.laterTask(state.current.id);
+  await cinder.laterTask(state.current.id);
   state.logOpen = false;
   await refresh();
 }
 
 async function completeCurrent() {
   if (!state.current) return;
-  await window.cinder.completeTask(state.current.id);
+  await cinder.completeTask(state.current.id);
   state.logOpen = false;
   await refresh();
 }
 
 async function searchCompleted() {
-  const results = await window.cinder.searchTasks(els.searchInput.value);
+  const results = await cinder.searchTasks(els.searchInput.value);
   els.searchResults.innerHTML = "";
   for (const task of results) {
     const item = document.createElement("button");

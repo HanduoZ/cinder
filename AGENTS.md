@@ -1,6 +1,6 @@
 # Agent instructions for Cinder
 
-Cinder is an open-source local desktop app. It is installed and maintained by AI agents as often as by humans.
+Cinder is an open-source local-first agent work host. It is installed and maintained by AI agents as often as by humans.
 
 ## Product intent
 
@@ -12,6 +12,8 @@ Core positioning:
 
 ## MVP behavior
 
+- Mac runs `cinder host`.
+- The UI is served locally as a browser/PWA app.
 - One card on the main screen.
 - Show the user's latest request.
 - Show the agent's full final answer.
@@ -26,9 +28,10 @@ Core positioning:
 - Prefer small, direct changes.
 - Avoid new dependencies unless they remove real complexity.
 - Keep installation agent-friendly: `./install.sh`, `cinder doctor`, `cinder open`.
-- Do not require cloud services for the core app.
+- Do not require cloud services, accounts, or centralized infrastructure for the core app.
 - Keep user data local by default.
 - Do not add analytics or telemetry without an explicit user-facing setting.
+- Keep the host/client boundary clean. The host owns tasks and CLI execution; clients only send commands and render state.
 
 ## CLI integration
 

@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "description": "Swipe through finished AI agent work.",
   "type": "module",
-  "main": "src/main/main.js",
+  "main": "src/host/server.js",
   "bin": {
     "cinder": "bin/cinder.js"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "node bin/cinder.js host",
     "doctor": "node bin/cinder.js doctor",
-    "open": "node bin/cinder.js open"
+    "open": "node bin/cinder.js"
   },
   "keywords": [
     "ai",
@@ -21,8 +21,5 @@
     "review-inbox"
   ],
   "author": "HanduoZ",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^39.2.7"
-  }
+  "license": "MIT"
 }

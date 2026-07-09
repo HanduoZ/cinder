@@ -17,8 +17,7 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 mkdir -p "$BIN_DIR"
-ELECTRON_MIRROR="${ELECTRON_MIRROR:-https://npmmirror.com/mirrors/electron/}" npm install --prefix "$ROOT_DIR"
-node "$ROOT_DIR/scripts/repair-electron.js"
+npm install --prefix "$ROOT_DIR"
 chmod +x "$ROOT_DIR/bin/cinder.js"
 ln -sf "$ROOT_DIR/bin/cinder.js" "$BIN_DIR/cinder"
 mkdir -p "$HOME/.cinder"
@@ -26,4 +25,5 @@ mkdir -p "$HOME/.cinder"
 echo
 echo "Cinder installed."
 echo "Run: cinder doctor"
-echo "Run: cinder open"
+echo "Run: cinder"
+echo "Phone/iPad on same Wi-Fi: cinder host --lan"
