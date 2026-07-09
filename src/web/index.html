@@ -17,7 +17,8 @@
         <div class="topbar-actions">
           <div class="stat"><span id="runningCount">0</span><small>running</small></div>
           <div class="stat active"><span id="reviewCount">0</span><small>to judge</small></div>
-          <button id="newTaskButton" class="button primary">New task</button>
+          <button id="newClaudeButton" class="button agent-button claude">Claude Code</button>
+          <button id="newCodexButton" class="button agent-button codex">Codex</button>
         </div>
       </header>
 
@@ -26,7 +27,10 @@
           <div id="emptyState" class="empty-state">
             <h2>No cards to judge</h2>
             <p>Start a Claude Code or Codex task. Finished results will land here.</p>
-            <button id="emptyNewTaskButton" class="button primary">New task</button>
+            <div class="agent-launchers">
+              <button id="emptyClaudeButton" class="button agent-button claude">Claude Code</button>
+              <button id="emptyCodexButton" class="button agent-button codex">Codex</button>
+            </div>
           </div>
 
           <div id="taskView" class="task-view hidden">
@@ -69,19 +73,26 @@
     <dialog id="newTaskDialog" class="dialog">
       <form id="newTaskForm" method="dialog">
         <div class="dialog-head">
-          <h2>New Cinder task</h2>
+          <h2 id="newTaskTitle">New conversation</h2>
           <button type="button" id="closeDialogButton" class="icon-button">x</button>
         </div>
 
-        <label>
-          Agent
-          <select name="provider">
-            <option value="claude">Claude Code</option>
-            <option value="codex">Codex CLI</option>
-          </select>
+        <div class="agent-switch" role="group" aria-label="Agent">
+          <button type="button" id="dialogClaudeButton" class="switch-button" data-provider="claude">Claude Code</button>
+          <button type="button" id="dialogCodexButton" class="switch-button" data-provider="codex">Codex</button>
+        </div>
+        <input type="hidden" name="provider" value="claude" />
+
+        <label class="request-box">
+          Request
+          <textarea name="prompt" required placeholder="Tell this agent what to do."></textarea>
         </label>
 
-        <div class="grid-2">
+        <div class="conversation-settings">
+          <label>
+            Project
+            <input name="cwd" placeholder="/Users/handuo/project" />
+          </label>
           <label>
             Model
             <input name="model" placeholder="sonnet, opus, gpt-5.5..." />
@@ -97,10 +108,7 @@
               <option value="max">max</option>
             </select>
           </label>
-        </div>
-
-        <div class="grid-2">
-          <label>
+          <label class="provider-setting claude-setting">
             Claude permission
             <select name="permission">
               <option value="">default</option>
@@ -111,7 +119,7 @@
               <option value="bypassPermissions">bypassPermissions</option>
             </select>
           </label>
-          <label>
+          <label class="provider-setting codex-setting">
             Codex approval
             <select name="approval">
               <option value="on-request">on-request</option>
@@ -120,16 +128,6 @@
             </select>
           </label>
         </div>
-
-        <label>
-          Project directory
-          <input name="cwd" placeholder="/Users/handuo/project" />
-        </label>
-
-        <label>
-          Request
-          <textarea name="prompt" required placeholder="What should the agent do?"></textarea>
-        </label>
 
         <details class="resume-box">
           <summary>Resume a completed task</summary>

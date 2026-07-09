@@ -2,6 +2,7 @@ const state = {
   tasks: [],
   current: null,
   selectedResumeTask: null,
+  draftProvider: "claude",
   logOpen: false,
   token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
 };
@@ -25,10 +26,15 @@ const els = {
   continueInput: document.getElementById("continueInput"),
   laterButton: document.getElementById("laterButton"),
   completeButton: document.getElementById("completeButton"),
-  newTaskButton: document.getElementById("newTaskButton"),
-  emptyNewTaskButton: document.getElementById("emptyNewTaskButton"),
+  newClaudeButton: document.getElementById("newClaudeButton"),
+  newCodexButton: document.getElementById("newCodexButton"),
+  emptyClaudeButton: document.getElementById("emptyClaudeButton"),
+  emptyCodexButton: document.getElementById("emptyCodexButton"),
   newTaskDialog: document.getElementById("newTaskDialog"),
   newTaskForm: document.getElementById("newTaskForm"),
+  newTaskTitle: document.getElementById("newTaskTitle"),
+  dialogClaudeButton: document.getElementById("dialogClaudeButton"),
+  dialogCodexButton: document.getElementById("dialogCodexButton"),
   closeDialogButton: document.getElementById("closeDialogButton"),
   searchInput: document.getElementById("searchInput"),
   searchResults: document.getElementById("searchResults")
@@ -109,11 +115,23 @@ async function refresh() {
   }
 }
 
-function openNewTaskDialog() {
+function setDraftProvider(provider) {
+  state.draftProvider = provider === "codex" ? "codex" : "claude";
+  els.newTaskForm.elements.provider.value = state.draftProvider;
+  els.newTaskTitle.textContent = state.draftProvider === "claude" ? "New Claude Code conversation" : "New Codex conversation";
+  els.dialogClaudeButton.classList.toggle("active", state.draftProvider === "claude");
+  els.dialogCodexButton.classList.toggle("active", state.draftProvider === "codex");
+  els.newTaskForm.classList.toggle("provider-claude", state.draftProvider === "claude");
+  els.newTaskForm.classList.toggle("provider-codex", state.draftProvider === "codex");
+}
+
+function openNewTaskDialog(provider = "claude") {
   state.selectedResumeTask = null;
   els.newTaskForm.reset();
   els.searchResults.innerHTML = "";
+  setDraftProvider(provider);
   els.newTaskDialog.showModal();
+  els.newTaskForm.elements.prompt.focus();
 }
 
 async function submitNewTask(event) {
@@ -191,8 +209,12 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
-els.newTaskButton.addEventListener("click", openNewTaskDialog);
-els.emptyNewTaskButton.addEventListener("click", openNewTaskDialog);
+els.newClaudeButton.addEventListener("click", () => openNewTaskDialog("claude"));
+els.newCodexButton.addEventListener("click", () => openNewTaskDialog("codex"));
+els.emptyClaudeButton.addEventListener("click", () => openNewTaskDialog("claude"));
+els.emptyCodexButton.addEventListener("click", () => openNewTaskDialog("codex"));
+els.dialogClaudeButton.addEventListener("click", () => setDraftProvider("claude"));
+els.dialogCodexButton.addEventListener("click", () => setDraftProvider("codex"));
 els.closeDialogButton.addEventListener("click", () => els.newTaskDialog.close());
 els.newTaskForm.addEventListener("submit", submitNewTask);
 els.laterButton.addEventListener("click", laterCurrent);
