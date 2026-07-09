@@ -130,6 +130,21 @@ function writeDb(db) {
   fs.renameSync(tempPath, dbPath);
 }
 
+function recoverInterruptedTasks() {
+  const db = readDb();
+  let changed = false;
+  for (const task of db.tasks) {
+    if (task.status !== "running") continue;
+    task.status = "review";
+    task.exitCode = null;
+    task.answer = task.answer || "Cinder was restarted while this task was running, so the CLI process is no longer attached.";
+    task.log += "\n[interrupted] Cinder restarted before this task finished.\n";
+    task.updatedAt = now();
+    changed = true;
+  }
+  if (changed) writeDb(db);
+}
+
 function updateTask(taskId, updater) {
   const db = readDb();
   const task = db.tasks.find((item) => item.id === taskId);
@@ -465,6 +480,7 @@ async function handleApi(request, response) {
 
 export function startServer(options = {}) {
   ensureDataDir();
+  recoverInterruptedTasks();
   const host = options.host || process.env.CINDER_HOST || "127.0.0.1";
   const port = Number(options.port || process.env.CINDER_PORT || 3737);
   const server = http.createServer((request, response) => {
