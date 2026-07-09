@@ -152,7 +152,7 @@ function render() {
   els.logPanel.classList.toggle("hidden", !state.logOpen);
   if (state.view === "review") {
     els.composer.classList.remove("hidden");
-    els.continueInput.placeholder = "Type a new request and press Enter. Shift+Enter for newline.";
+    els.continueInput.placeholder = "Type a new request. Enter for newline. Cmd+Enter to send.";
     els.actionButton.textContent = "Send";
   } else {
     els.composer.classList.add("hidden");
@@ -194,7 +194,7 @@ function renderDraft() {
   els.nextCardButton.classList.add("hidden");
   els.deckPosition.textContent = "";
 
-  els.continueInput.placeholder = "Tell Cinder what to run. Press Enter to start.";
+  els.continueInput.placeholder = "Tell Cinder what to run. Enter for newline. Cmd+Enter to send.";
   els.actionButton.textContent = "Send";
 
   renderModelOptions();
@@ -204,6 +204,9 @@ function renderDraft() {
 async function refresh() {
   try {
     state.tasks = await cinder.listTasks();
+    if (state.draft && state.view === "review" && reviewQueue().length && !els.continueInput.value.trim()) {
+      state.draft = null;
+    }
     render();
   } catch (error) {
     els.emptyState.classList.remove("hidden");
@@ -446,7 +449,7 @@ els.toggleLogButton.addEventListener("click", () => {
   render();
 });
 els.continueInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (event.key === "Enter" && event.metaKey && !event.isComposing && event.keyCode !== 229) {
     event.preventDefault();
     continueCurrent();
   }
