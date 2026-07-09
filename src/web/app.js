@@ -37,8 +37,7 @@ const els = {
   logText: document.getElementById("logText"),
   toggleLogButton: document.getElementById("toggleLogButton"),
   continueInput: document.getElementById("continueInput"),
-  laterButton: document.getElementById("laterButton"),
-  completeButton: document.getElementById("completeButton"),
+  actionButton: document.getElementById("actionButton"),
   newClaudeButton: document.getElementById("newClaudeButton"),
   newCodexButton: document.getElementById("newCodexButton"),
   emptyClaudeButton: document.getElementById("emptyClaudeButton"),
@@ -147,8 +146,7 @@ function render() {
   if (state.view === "review") {
     els.composer.classList.remove("hidden");
     els.continueInput.placeholder = "Type a new request and press Enter. Shift+Enter for newline.";
-    els.laterButton.textContent = "Later";
-    els.completeButton.textContent = "Done";
+    els.actionButton.textContent = "Send";
   } else {
     els.composer.classList.add("hidden");
   }
@@ -206,8 +204,7 @@ function renderDraft() {
   els.logText.textContent = "";
   els.logPanel.classList.toggle("hidden", !state.logOpen);
   els.continueInput.placeholder = `Tell ${draft.provider === "claude" ? "Claude Code" : "Codex"} what to do. Press Enter to start.`;
-  els.laterButton.textContent = "Cancel";
-  els.completeButton.textContent = "Start";
+  els.actionButton.textContent = "Send";
 
   renderModelOptions();
   renderEffortOptions();
@@ -355,33 +352,6 @@ async function continueCurrent() {
   await refresh();
 }
 
-async function laterCurrent() {
-  if (state.draft) {
-    state.draft = null;
-    els.continueInput.value = "";
-    state.logOpen = false;
-    render();
-    return;
-  }
-  if (state.view !== "review") return;
-  if (!state.current) return;
-  await cinder.laterTask(state.current.id);
-  state.logOpen = false;
-  await refresh();
-}
-
-async function completeCurrent() {
-  if (state.draft) {
-    await startDraft();
-    return;
-  }
-  if (state.view !== "review") return;
-  if (!state.current) return;
-  await cinder.completeTask(state.current.id);
-  state.logOpen = false;
-  await refresh();
-}
-
 function escapeHtml(text) {
   return String(text)
     .replaceAll("&", "&amp;")
@@ -418,8 +388,7 @@ els.previousCardButton.addEventListener("click", () => moveDeck(-1));
 els.nextCardButton.addEventListener("click", () => moveDeck(1));
 els.draftModel.addEventListener("change", syncDraftFromControls);
 els.draftEffort.addEventListener("change", syncDraftFromControls);
-els.laterButton.addEventListener("click", laterCurrent);
-els.completeButton.addEventListener("click", completeCurrent);
+els.actionButton.addEventListener("click", continueCurrent);
 els.toggleLogButton.addEventListener("click", () => {
   state.logOpen = !state.logOpen;
   render();
