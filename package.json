@@ -1,0 +1,28 @@
+{
+  "name": "cinder",
+  "version": "0.1.0",
+  "description": "Swipe through finished AI agent work.",
+  "type": "module",
+  "main": "src/main/main.js",
+  "bin": {
+    "cinder": "bin/cinder.js"
+  },
+  "scripts": {
+    "start": "electron .",
+    "doctor": "node bin/cinder.js doctor",
+    "open": "node bin/cinder.js open"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "claude-code",
+    "codex",
+    "vibe-coding",
+    "review-inbox"
+  ],
+  "author": "HanduoZ",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^39.2.7"
+  }
+}

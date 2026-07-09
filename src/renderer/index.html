@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cinder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Cinder</h1>
+          <p>Swipe through finished agent work.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="stat"><span id="runningCount">0</span><small>running</small></div>
+          <div class="stat active"><span id="reviewCount">0</span><small>to judge</small></div>
+          <button id="newTaskButton" class="button primary">New task</button>
+        </div>
+      </header>
+
+      <section class="stage">
+        <article id="card" class="review-card">
+          <div id="emptyState" class="empty-state">
+            <h2>No cards to judge</h2>
+            <p>Start a Claude Code or Codex task. Finished results will land here.</p>
+            <button id="emptyNewTaskButton" class="button primary">New task</button>
+          </div>
+
+          <div id="taskView" class="task-view hidden">
+            <div class="task-meta">
+              <span id="providerBadge" class="badge">agent</span>
+              <span id="modelBadge" class="muted"></span>
+              <span id="cwdBadge" class="muted"></span>
+            </div>
+
+            <section class="panel context-panel">
+              <h2>Last request</h2>
+              <pre id="promptText"></pre>
+            </section>
+
+            <section class="panel answer-panel">
+              <div class="panel-head">
+                <h2>Answer</h2>
+                <button id="toggleLogButton" class="button subtle">Process</button>
+              </div>
+              <pre id="answerText"></pre>
+            </section>
+
+            <section id="logPanel" class="panel log-panel hidden">
+              <h2>Process</h2>
+              <pre id="logText"></pre>
+            </section>
+          </div>
+        </article>
+
+        <section id="composer" class="composer hidden">
+          <textarea id="continueInput" placeholder="Type a new request and press Enter. Shift+Enter for newline."></textarea>
+          <div class="composer-actions">
+            <button id="laterButton" class="button">Later</button>
+            <button id="completeButton" class="button success">Done</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="newTaskDialog" class="dialog">
+      <form id="newTaskForm" method="dialog">
+        <div class="dialog-head">
+          <h2>New Cinder task</h2>
+          <button type="button" id="closeDialogButton" class="icon-button">x</button>
+        </div>
+
+        <label>
+          Agent
+          <select name="provider">
+            <option value="claude">Claude Code</option>
+            <option value="codex">Codex CLI</option>
+          </select>
+        </label>
+
+        <div class="grid-2">
+          <label>
+            Model
+            <input name="model" placeholder="sonnet, opus, gpt-5.5..." />
+          </label>
+          <label>
+            Effort
+            <select name="effort">
+              <option value="">default</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <label>
+            Claude permission
+            <select name="permission">
+              <option value="">default</option>
+              <option value="auto">auto</option>
+              <option value="acceptEdits">acceptEdits</option>
+              <option value="manual">manual</option>
+              <option value="plan">plan</option>
+              <option value="bypassPermissions">bypassPermissions</option>
+            </select>
+          </label>
+          <label>
+            Codex approval
+            <select name="approval">
+              <option value="on-request">on-request</option>
+              <option value="untrusted">untrusted</option>
+              <option value="never">never</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Project directory
+          <input name="cwd" placeholder="/Users/handuo/project" />
+        </label>
+
+        <label>
+          Request
+          <textarea name="prompt" required placeholder="What should the agent do?"></textarea>
+        </label>
+
+        <details class="resume-box">
+          <summary>Resume a completed task</summary>
+          <input id="searchInput" placeholder="Search completed tasks..." />
+          <div id="searchResults" class="search-results"></div>
+        </details>
+
+        <div class="dialog-actions">
+          <button type="submit" class="button primary">Start</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
