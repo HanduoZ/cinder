@@ -16,6 +16,30 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+.app-shell,
+.review-card,
+.task-view,
+.panel,
+pre {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button,
+select,
+.stat,
+.badge,
+.muted,
+.draft-controls,
+.composer-actions,
+.answer-actions,
+.image-chip {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 body {
   margin: 0;
   background: radial-gradient(circle at 30% 0%, rgba(255, 107, 74, 0.16), transparent 28%), var(--bg);
