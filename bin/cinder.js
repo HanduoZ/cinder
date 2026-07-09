@@ -59,7 +59,11 @@ function doctor() {
   console.log(`Repo: ${rootDir}`);
   console.log(`${fs.existsSync(claudeSettings) ? "OK " : "NO "} Claude settings: ${claudeSettings}`);
   console.log(`${fs.existsSync(codexConfig) ? "OK " : "NO "} Codex config: ${codexConfig}`);
-  console.log("\nRun: cinder");
+  if (process.platform === "darwin") {
+    console.log(`\nOpen Mac app: open ${path.join(os.homedir(), "Applications", "Cinder.app")}`);
+  } else {
+    console.log("\nRun: cinder");
+  }
   console.log("Phone/iPad on same Wi-Fi: cinder host --lan");
 
   if (!exists("claude") || !exists("codex")) {

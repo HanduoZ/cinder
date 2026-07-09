@@ -18,6 +18,7 @@ fi
 
 mkdir -p "$BIN_DIR"
 npm install --prefix "$ROOT_DIR"
+node "$ROOT_DIR/scripts/install-mac-app.js"
 chmod +x "$ROOT_DIR/bin/cinder.js"
 ln -sf "$ROOT_DIR/bin/cinder.js" "$BIN_DIR/cinder"
 mkdir -p "$HOME/.cinder"
@@ -25,5 +26,12 @@ mkdir -p "$HOME/.cinder"
 echo
 echo "Cinder installed."
 echo "Run: cinder doctor"
-echo "Run: cinder"
+if [ "$(uname)" = "Darwin" ]; then
+  echo "Open Mac app: open $HOME/Applications/Cinder.app"
+else
+  echo "Run: cinder"
+fi
 echo "Phone/iPad on same Wi-Fi: cinder host --lan"
+if [ "$(uname)" = "Darwin" ]; then
+  echo "Mac app: $HOME/Applications/Cinder.app"
+fi
