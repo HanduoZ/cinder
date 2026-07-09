@@ -40,6 +40,62 @@
               <span id="cwdBadge" class="muted"></span>
             </div>
 
+            <details id="draftSettings" class="draft-settings hidden">
+              <summary>Settings</summary>
+              <div class="draft-grid">
+                <label>
+                  Agent
+                  <select id="draftProvider">
+                    <option value="claude">Claude Code</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </label>
+                <label>
+                  Project
+                  <input id="draftCwd" placeholder="/Users/handuo/project" />
+                </label>
+                <label>
+                  Model
+                  <input id="draftModel" placeholder="sonnet, opus, gpt-5.5..." />
+                </label>
+                <label>
+                  Effort
+                  <select id="draftEffort">
+                    <option value="">default</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="xhigh">xhigh</option>
+                    <option value="max">max</option>
+                  </select>
+                </label>
+                <label id="draftClaudePermissionLabel">
+                  Claude permission
+                  <select id="draftPermission">
+                    <option value="">default</option>
+                    <option value="auto">auto</option>
+                    <option value="acceptEdits">acceptEdits</option>
+                    <option value="manual">manual</option>
+                    <option value="plan">plan</option>
+                    <option value="bypassPermissions">bypassPermissions</option>
+                  </select>
+                </label>
+                <label id="draftCodexApprovalLabel">
+                  Codex approval
+                  <select id="draftApproval">
+                    <option value="on-request">on-request</option>
+                    <option value="untrusted">untrusted</option>
+                    <option value="never">never</option>
+                  </select>
+                </label>
+              </div>
+              <details class="resume-box">
+                <summary>Resume a completed task</summary>
+                <input id="searchInput" placeholder="Search completed tasks..." />
+                <div id="searchResults" class="search-results"></div>
+              </details>
+            </details>
+
             <section class="panel context-panel">
               <h2>Last request</h2>
               <pre id="promptText"></pre>
@@ -69,77 +125,6 @@
         </section>
       </section>
     </main>
-
-    <dialog id="newTaskDialog" class="dialog">
-      <form id="newTaskForm" method="dialog">
-        <div class="dialog-head">
-          <h2 id="newTaskTitle">New conversation</h2>
-          <button type="button" id="closeDialogButton" class="icon-button">x</button>
-        </div>
-
-        <div class="agent-switch" role="group" aria-label="Agent">
-          <button type="button" id="dialogClaudeButton" class="switch-button" data-provider="claude">Claude Code</button>
-          <button type="button" id="dialogCodexButton" class="switch-button" data-provider="codex">Codex</button>
-        </div>
-        <input type="hidden" name="provider" value="claude" />
-
-        <label class="request-box">
-          Request
-          <textarea name="prompt" required placeholder="Tell this agent what to do."></textarea>
-        </label>
-
-        <div class="conversation-settings">
-          <label>
-            Project
-            <input name="cwd" placeholder="/Users/handuo/project" />
-          </label>
-          <label>
-            Model
-            <input name="model" placeholder="sonnet, opus, gpt-5.5..." />
-          </label>
-          <label>
-            Effort
-            <select name="effort">
-              <option value="">default</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="xhigh">xhigh</option>
-              <option value="max">max</option>
-            </select>
-          </label>
-          <label class="provider-setting claude-setting">
-            Claude permission
-            <select name="permission">
-              <option value="">default</option>
-              <option value="auto">auto</option>
-              <option value="acceptEdits">acceptEdits</option>
-              <option value="manual">manual</option>
-              <option value="plan">plan</option>
-              <option value="bypassPermissions">bypassPermissions</option>
-            </select>
-          </label>
-          <label class="provider-setting codex-setting">
-            Codex approval
-            <select name="approval">
-              <option value="on-request">on-request</option>
-              <option value="untrusted">untrusted</option>
-              <option value="never">never</option>
-            </select>
-          </label>
-        </div>
-
-        <details class="resume-box">
-          <summary>Resume a completed task</summary>
-          <input id="searchInput" placeholder="Search completed tasks..." />
-          <div id="searchResults" class="search-results"></div>
-        </details>
-
-        <div class="dialog-actions">
-          <button type="submit" class="button primary">Start</button>
-        </div>
-      </form>
-    </dialog>
 
     <script src="/app.js"></script>
   </body>

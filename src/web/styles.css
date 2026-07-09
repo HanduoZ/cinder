@@ -138,7 +138,7 @@ h1 {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(120px, 0.32fr) minmax(220px, 1fr) minmax(120px, 0.45fr);
+  grid-template-rows: auto auto minmax(120px, 0.32fr) minmax(220px, 1fr) minmax(120px, 0.45fr);
   gap: 12px;
   padding: 18px;
 }
@@ -160,6 +160,32 @@ h1 {
   border: 1px solid rgba(255, 107, 74, 0.42);
   color: #ffd3c8;
   font-weight: 700;
+}
+
+.draft-settings {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.draft-settings summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 9px 12px;
+  font-weight: 700;
+}
+
+.draft-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.85fr) minmax(170px, 1.25fr) minmax(140px, 1fr) minmax(110px, 0.7fr) minmax(150px, 0.95fr);
+  gap: 10px;
+  padding: 0 12px 12px;
+  align-items: end;
+}
+
+.draft-settings .resume-box {
+  margin: 0 12px 12px;
 }
 
 .panel {
@@ -421,6 +447,7 @@ select {
 
   .topbar,
   .composer,
+  .draft-grid,
   .conversation-settings {
     grid-template-columns: 1fr;
     display: grid;
