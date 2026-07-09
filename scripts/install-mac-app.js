@@ -13,6 +13,9 @@ const macosDir = path.join(contentsDir, "MacOS");
 const resourcesDir = path.join(contentsDir, "Resources");
 const swiftPath = path.join(resourcesDir, "CinderApp.swift");
 const startHostPath = path.join(resourcesDir, "start-host.sh");
+const sourceIconPath = path.join(rootDir, "src/web/cinder-icon.png");
+const iconPath = path.join(resourcesDir, "CinderIcon.icns");
+const iconTiffPath = path.join(resourcesDir, "CinderIcon.tiff");
 
 if (process.platform !== "darwin") {
   process.exit(0);
@@ -38,6 +41,8 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
   <string>0.1.0</string>
   <key>CFBundleExecutable</key>
   <string>Cinder</string>
+  <key>CFBundleIconFile</key>
+  <string>CinderIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -279,6 +284,13 @@ exec /usr/bin/env node "$ROOT_DIR/bin/cinder.js" host --no-open >> "$LOG_FILE" 2
 );
 fs.chmodSync(startHostPath, 0o755);
 fs.writeFileSync(swiftPath, swiftSource);
+
+if (fs.existsSync(sourceIconPath)) {
+  const tiff = spawnSync("sips", ["-z", "1024", "1024", "-s", "format", "tiff", sourceIconPath, "--out", iconTiffPath], { stdio: "ignore" });
+  if (tiff.status !== 0) throw new Error("Failed to prepare Cinder app icon.");
+  const icns = spawnSync("/usr/bin/tiff2icns", [iconTiffPath, iconPath], { stdio: "inherit" });
+  if (icns.status !== 0) throw new Error("Failed to create Cinder app icon.");
+}
 
 const swiftc = spawnSync(
   "/usr/bin/swiftc",

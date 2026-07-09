@@ -5,5 +5,13 @@
   "start_url": "/",
   "background_color": "#101114",
   "theme_color": "#101114",
-  "description": "Swipe through finished AI agent work."
+  "description": "Swipe through finished AI agent work.",
+  "icons": [
+    {
+      "src": "/cinder-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
