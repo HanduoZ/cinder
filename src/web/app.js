@@ -2,6 +2,7 @@ const state = {
   tasks: [],
   current: null,
   draft: null,
+  options: { providers: {} },
   logOpen: false,
   token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
 };
@@ -51,6 +52,7 @@ async function api(path, options = {}) {
 
 const cinder = {
   listTasks: () => api("/api/tasks"),
+  getOptions: () => api("/api/options"),
   createTask: (input) => api("/api/tasks", { method: "POST", body: JSON.stringify(input) }),
   continueTask: (taskId, prompt) =>
     api(`/api/tasks/${encodeURIComponent(taskId)}/continue`, { method: "POST", body: JSON.stringify({ prompt }) }),
@@ -118,6 +120,7 @@ function render() {
 
 function renderDraft() {
   const draft = state.draft;
+  const providerOptions = state.options.providers?.[draft.provider] || {};
   els.emptyState.classList.add("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
@@ -125,7 +128,7 @@ function renderDraft() {
   els.draftControls.classList.remove("hidden");
 
   els.providerBadge.textContent = draft.provider === "claude" ? "Claude Code" : "Codex CLI";
-  els.modelBadge.textContent = draft.model || "default model";
+  els.modelBadge.textContent = draft.model || providerOptions.defaultModel || "default model";
   els.cwdBadge.textContent = "";
   els.promptText.textContent = draft.prompt || "";
   els.answerText.textContent = "";
@@ -135,8 +138,8 @@ function renderDraft() {
   els.laterButton.textContent = "Cancel";
   els.completeButton.textContent = "Start";
 
-  els.draftModel.value = draft.model || "";
-  els.draftEffort.value = draft.effort || "";
+  renderModelOptions();
+  renderEffortOptions();
 }
 
 async function refresh() {
@@ -148,6 +151,14 @@ async function refresh() {
     els.taskView.classList.add("hidden");
     els.composer.classList.add("hidden");
     els.emptyState.innerHTML = `<h2>Cannot connect to Cinder</h2><p>${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function refreshOptions() {
+  try {
+    state.options = await cinder.getOptions();
+  } catch {
+    state.options = { providers: {} };
   }
 }
 
@@ -168,9 +179,40 @@ function openDraft(provider = "claude") {
 
 function syncDraftFromControls() {
   if (!state.draft) return;
-  state.draft.model = els.draftModel.value.trim();
+  state.draft.model = els.draftModel.value;
   state.draft.effort = els.draftEffort.value;
   render();
+}
+
+function renderModelOptions() {
+  const providerOptions = state.options.providers?.[state.draft.provider] || {};
+  const defaultLabel = providerOptions.defaultModel ? `model: default (${providerOptions.defaultModel})` : "model: default";
+  const models = providerOptions.models || [];
+  els.draftModel.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>`;
+  for (const model of models) {
+    const option = document.createElement("option");
+    option.value = model.value;
+    option.textContent = model.label || model.value;
+    els.draftModel.appendChild(option);
+  }
+  els.draftModel.value = state.draft.model || "";
+}
+
+function renderEffortOptions() {
+  const providerOptions = state.options.providers?.[state.draft.provider] || {};
+  const selectedModel = (providerOptions.models || []).find((model) => model.value === state.draft.model);
+  const efforts = selectedModel?.efforts?.length ? selectedModel.efforts : providerOptions.efforts || [];
+  const defaultEffort = selectedModel?.defaultEffort || providerOptions.defaultEffort || "";
+  const defaultLabel = defaultEffort ? `effort: default (${defaultEffort})` : "effort: default";
+  els.draftEffort.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>`;
+  for (const effort of efforts) {
+    const option = document.createElement("option");
+    option.value = effort;
+    option.textContent = `effort: ${effort}`;
+    els.draftEffort.appendChild(option);
+  }
+  els.draftEffort.value = efforts.includes(state.draft.effort) ? state.draft.effort : "";
+  state.draft.effort = els.draftEffort.value;
 }
 
 async function startDraft() {
@@ -244,7 +286,7 @@ els.newClaudeButton.addEventListener("click", () => openDraft("claude"));
 els.newCodexButton.addEventListener("click", () => openDraft("codex"));
 els.emptyClaudeButton.addEventListener("click", () => openDraft("claude"));
 els.emptyCodexButton.addEventListener("click", () => openDraft("codex"));
-els.draftModel.addEventListener("input", syncDraftFromControls);
+els.draftModel.addEventListener("change", syncDraftFromControls);
 els.draftEffort.addEventListener("change", syncDraftFromControls);
 els.laterButton.addEventListener("click", laterCurrent);
 els.completeButton.addEventListener("click", completeCurrent);
@@ -265,4 +307,4 @@ els.continueInput.addEventListener("input", () => {
 });
 
 setInterval(refresh, 2000);
-refresh();
+refreshOptions().then(refresh);

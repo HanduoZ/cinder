@@ -37,6 +37,83 @@ function readConfig() {
   return JSON.parse(fs.readFileSync(configPath, "utf8"));
 }
 
+function readJsonIfExists(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function readTomlValue(filePath, key) {
+  try {
+    if (!fs.existsSync(filePath)) return "";
+    const pattern = new RegExp(`^${key}\\s*=\\s*"(.*)"\\s*$`);
+    for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
+      const match = line.match(pattern);
+      if (match) return match[1];
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function uniqueOptions(options) {
+  const seen = new Set();
+  return options.filter((option) => {
+    if (!option?.value || seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
+}
+
+function readCliOptions() {
+  const codexConfigPath = path.join(os.homedir(), ".codex/config.toml");
+  const codexModelsPath = path.join(os.homedir(), ".codex/models_cache.json");
+  const claudeSettingsPath = path.join(os.homedir(), ".claude/settings.json");
+  const codexConfigModel = readTomlValue(codexConfigPath, "model");
+  const codexConfigEffort = readTomlValue(codexConfigPath, "model_reasoning_effort");
+  const codexCache = readJsonIfExists(codexModelsPath);
+  const codexModels = uniqueOptions(
+    (codexCache?.models || []).map((model) => ({
+      value: model.slug,
+      label: model.display_name || model.slug,
+      defaultEffort: model.default_reasoning_level || "",
+      efforts: (model.supported_reasoning_levels || []).map((level) => level.effort).filter(Boolean)
+    }))
+  );
+
+  if (codexConfigModel && !codexModels.some((model) => model.value === codexConfigModel)) {
+    codexModels.unshift({ value: codexConfigModel, label: codexConfigModel, defaultEffort: codexConfigEffort, efforts: [] });
+  }
+
+  const codexEfforts = [...new Set(codexModels.flatMap((model) => model.efforts || []))];
+  if (codexConfigEffort && !codexEfforts.includes(codexConfigEffort)) codexEfforts.unshift(codexConfigEffort);
+
+  const claudeSettings = readJsonIfExists(claudeSettingsPath) || {};
+  const claudeConfigModel = typeof claudeSettings.model === "string" ? claudeSettings.model : "";
+  const claudeModels = claudeConfigModel ? [{ value: claudeConfigModel, label: claudeConfigModel, defaultEffort: "", efforts: [] }] : [];
+
+  return {
+    providers: {
+      codex: {
+        defaultModel: codexConfigModel,
+        defaultEffort: codexConfigEffort,
+        models: codexModels,
+        efforts: codexEfforts
+      },
+      claude: {
+        defaultModel: claudeConfigModel,
+        defaultEffort: "",
+        models: claudeModels,
+        efforts: []
+      }
+    }
+  };
+}
+
 function readDb() {
   ensureDataDir();
   try {
@@ -72,8 +149,8 @@ function createTask(input) {
     model: input.model || "",
     effort: input.effort || "",
     permission: input.permission || "",
-    sandbox: input.sandbox || "workspace-write",
-    approval: input.approval || "on-request",
+    sandbox: input.sandbox || "",
+    approval: input.approval || "",
     lastPrompt: input.prompt.trim(),
     answer: "",
     log: "",
@@ -356,6 +433,7 @@ async function handleApi(request, response) {
         lanAddress: getLanAddress()
       });
     }
+    if (method === "GET" && requestUrl.pathname === "/api/options") return sendJson(response, 200, readCliOptions());
     if (method === "GET" && requestUrl.pathname === "/api/tasks/search") {
       return sendJson(response, 200, searchTasks(requestUrl.searchParams.get("q")));
     }
