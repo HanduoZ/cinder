@@ -12,6 +12,7 @@ const webDir = path.join(rootDir, "src/web");
 const dataDir = path.join(os.homedir(), ".cinder");
 const dbPath = path.join(dataDir, "tasks.json");
 const configPath = path.join(dataDir, "config.json");
+const attachmentsDir = path.join(dataDir, "attachments");
 const activeProcesses = new Map();
 
 function now() {
@@ -20,6 +21,7 @@ function now() {
 
 function ensureDataDir() {
   fs.mkdirSync(dataDir, { recursive: true });
+  fs.mkdirSync(attachmentsDir, { recursive: true });
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, JSON.stringify({ tasks: [] }, null, 2));
   }
@@ -155,6 +157,32 @@ function updateTask(taskId, updater) {
   return task;
 }
 
+function imageExtension(type, name = "") {
+  const ext = path.extname(name).toLowerCase();
+  if ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext)) return ext;
+  if (type === "image/jpeg") return ".jpg";
+  if (type === "image/webp") return ".webp";
+  if (type === "image/gif") return ".gif";
+  return ".png";
+}
+
+function saveImages(taskId, images = []) {
+  if (!Array.isArray(images) || !images.length) return [];
+  const taskDir = path.join(attachmentsDir, taskId);
+  fs.mkdirSync(taskDir, { recursive: true });
+  const prefix = Date.now().toString(36);
+  return images.map((image, index) => {
+    if (!String(image?.type || "").startsWith("image/")) throw new Error("Only image attachments are supported.");
+    const [, base64 = ""] = String(image.data || "").split(",");
+    const buffer = Buffer.from(base64, "base64");
+    if (!buffer.length) throw new Error("Invalid image attachment.");
+    if (buffer.length > 12_000_000) throw new Error("Image attachment is too large.");
+    const filePath = path.join(taskDir, `${prefix}-${String(index + 1).padStart(2, "0")}${imageExtension(image.type, image.name)}`);
+    fs.writeFileSync(filePath, buffer, { mode: 0o600 });
+    return filePath;
+  });
+}
+
 function createTask(input) {
   const db = readDb();
   const task = {
@@ -171,14 +199,16 @@ function createTask(input) {
     log: "",
     status: "running",
     deferredCount: 0,
+    queuedContinuations: [],
     createdAt: now(),
     updatedAt: now(),
     completedAt: null,
     commandPreview: ""
   };
+  const imagePaths = saveImages(task.id, input.images);
   db.tasks.unshift(task);
   writeDb(db);
-  runTask(task, task.lastPrompt);
+  runTask(task, task.lastPrompt, imagePaths);
   return task;
 }
 
@@ -191,8 +221,11 @@ function appendLog(taskId, chunk) {
   });
 }
 
-function buildCommand(task, prompt) {
+function buildCommand(task, prompt, images = []) {
   if (task.provider === "claude") {
+    if (images.length) {
+      prompt = `${prompt}\n\nAttached images:\n${images.map((imagePath) => `@${imagePath}`).join("\n")}`;
+    }
     const args = ["-p", prompt, "--output-format", "text"];
     if (task.model) args.push("--model", task.model);
     if (task.effort) args.push("--effort", task.effort);
@@ -201,6 +234,7 @@ function buildCommand(task, prompt) {
   }
 
   const args = ["exec", "-C", task.cwd];
+  for (const imagePath of images) args.push("-i", imagePath);
   if (task.model) args.push("-m", task.model);
   args.push("--skip-git-repo-check");
   if (task.sandbox) args.push("-s", task.sandbox);
@@ -209,8 +243,61 @@ function buildCommand(task, prompt) {
   return { command: "codex", args };
 }
 
-function runTask(task, prompt) {
-  const { command, args } = buildCommand(task, prompt);
+function buildContinuationPrompt(task, prompt, previousPrompt = task.lastPrompt) {
+  return [
+    "Continue this existing AI coding task.",
+    "",
+    "Previous user request:",
+    previousPrompt || "(none)",
+    "",
+    "Previous agent answer:",
+    task.answer || "(none)",
+    "",
+    "New user request:",
+    prompt.trim()
+  ].join("\n");
+}
+
+function queueContinuation(task, prompt, input, imagePaths) {
+  const queuedContinuations = Array.isArray(task.queuedContinuations) ? task.queuedContinuations : [];
+  const previousPrompt = queuedContinuations.length
+    ? queuedContinuations[queuedContinuations.length - 1].prompt
+    : task.lastPrompt;
+  const queued = {
+    prompt: prompt.trim(),
+    previousPrompt,
+    model: input.model || "",
+    effort: input.effort || "",
+    imagePaths,
+    createdAt: now()
+  };
+  const updated = updateTask(task.id, (item) => {
+    item.queuedContinuations = [...(Array.isArray(item.queuedContinuations) ? item.queuedContinuations : []), queued];
+    item.lastPrompt = queued.prompt;
+    item.log += `\n[queued continuation] ${queued.prompt}\n`;
+  });
+  return updated;
+}
+
+function startNextQueuedContinuation(taskId) {
+  const db = readDb();
+  const task = db.tasks.find((item) => item.id === taskId);
+  if (!task || !Array.isArray(task.queuedContinuations) || !task.queuedContinuations.length) return false;
+  const [queued, ...rest] = task.queuedContinuations;
+  task.queuedContinuations = rest;
+  task.lastPrompt = queued.prompt;
+  task.model = queued.model || "";
+  task.effort = queued.effort || "";
+  task.status = "running";
+  task.updatedAt = now();
+  writeDb(db);
+  const continuationPrompt = buildContinuationPrompt(task, queued.prompt, queued.previousPrompt);
+  runTask(task, continuationPrompt, queued.imagePaths || []);
+  return true;
+}
+
+function runTask(task, prompt, images = []) {
+  const { command, args } = buildCommand(task, prompt, images);
   const commandPreview = [command, ...args.map((arg) => (arg.includes(" ") ? JSON.stringify(arg) : arg))].join(" ");
   updateTask(task.id, (item) => {
     item.status = "running";
@@ -259,6 +346,7 @@ function runTask(task, prompt) {
       item.exitCode = code;
       item.log += `\n[process exited with code ${code}]\n`;
     });
+    startNextQueuedContinuation(task.id);
   });
 }
 
@@ -266,18 +354,11 @@ function continueTask(taskId, prompt, input = {}) {
   if (!prompt?.trim()) throw new Error("Prompt is required.");
   const original = readDb().tasks.find((item) => item.id === taskId);
   if (!original) throw new Error("Task not found.");
-  const continuationPrompt = [
-    "Continue this existing AI coding task.",
-    "",
-    "Previous user request:",
-    original.lastPrompt,
-    "",
-    "Previous agent answer:",
-    original.answer || "(none)",
-    "",
-    "New user request:",
-    prompt.trim()
-  ].join("\n");
+  const imagePaths = saveImages(taskId, input.images);
+  if (original.status === "running" && activeProcesses.has(taskId)) {
+    return queueContinuation(original, prompt, input, imagePaths);
+  }
+  const continuationPrompt = buildContinuationPrompt(original, prompt);
   const task = updateTask(taskId, (item) => {
     item.lastPrompt = prompt.trim();
     item.model = input.model || "";
@@ -285,7 +366,7 @@ function continueTask(taskId, prompt, input = {}) {
     item.status = "running";
   });
   if (!task) throw new Error("Task not found.");
-  runTask(task, continuationPrompt);
+  runTask(task, continuationPrompt, imagePaths);
   return task;
 }
 
@@ -310,6 +391,7 @@ function completeTask(taskId) {
   const task = updateTask(taskId, (item) => {
     item.status = "done";
     item.completedAt = now();
+    item.queuedContinuations = [];
   });
   if (!task) throw new Error("Task not found.");
   return task;
@@ -371,7 +453,7 @@ function readBody(request) {
     let body = "";
     request.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 2_000_000) {
+      if (body.length > 30_000_000) {
         reject(new Error("Request body is too large."));
         request.destroy();
       }
