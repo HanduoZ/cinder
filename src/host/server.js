@@ -187,6 +187,7 @@ function buildCommand(task, prompt) {
 
   const args = ["exec", "-C", task.cwd];
   if (task.model) args.push("-m", task.model);
+  args.push("--skip-git-repo-check");
   if (task.sandbox) args.push("-s", task.sandbox);
   if (task.approval) args.push("-a", task.approval);
   args.push(prompt);
@@ -246,7 +247,7 @@ function runTask(task, prompt) {
   });
 }
 
-function continueTask(taskId, prompt) {
+function continueTask(taskId, prompt, input = {}) {
   if (!prompt?.trim()) throw new Error("Prompt is required.");
   const original = readDb().tasks.find((item) => item.id === taskId);
   if (!original) throw new Error("Task not found.");
@@ -264,6 +265,8 @@ function continueTask(taskId, prompt) {
   ].join("\n");
   const task = updateTask(taskId, (item) => {
     item.lastPrompt = prompt.trim();
+    item.model = input.model || "";
+    item.effort = input.effort || "";
     item.status = "running";
   });
   if (!task) throw new Error("Task not found.");
@@ -448,7 +451,7 @@ async function handleApi(request, response) {
     if (method === "POST" && taskAction) {
       const [, taskId, action] = taskAction;
       const input = await readBody(request);
-      if (action === "continue") return sendJson(response, 200, continueTask(taskId, input.prompt));
+      if (action === "continue") return sendJson(response, 200, continueTask(taskId, input.prompt, input));
       if (action === "later") return sendJson(response, 200, laterTask(taskId));
       if (action === "complete") return sendJson(response, 200, completeTask(taskId));
       if (action === "resume") return sendJson(response, 200, resumeTask(taskId, input.prompt));

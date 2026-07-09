@@ -3,6 +3,7 @@ const state = {
   current: null,
   draft: null,
   options: { providers: {} },
+  taskOverrides: {},
   logOpen: false,
   token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
 };
@@ -54,8 +55,8 @@ const cinder = {
   listTasks: () => api("/api/tasks"),
   getOptions: () => api("/api/options"),
   createTask: (input) => api("/api/tasks", { method: "POST", body: JSON.stringify(input) }),
-  continueTask: (taskId, prompt) =>
-    api(`/api/tasks/${encodeURIComponent(taskId)}/continue`, { method: "POST", body: JSON.stringify({ prompt }) }),
+  continueTask: (taskId, input) =>
+    api(`/api/tasks/${encodeURIComponent(taskId)}/continue`, { method: "POST", body: JSON.stringify(input) }),
   laterTask: (taskId) => api(`/api/tasks/${encodeURIComponent(taskId)}/later`, { method: "POST", body: "{}" }),
   completeTask: (taskId) => api(`/api/tasks/${encodeURIComponent(taskId)}/complete`, { method: "POST", body: "{}" }),
   searchTasks: (query) => api(`/api/tasks/search?q=${encodeURIComponent(query || "")}`),
@@ -100,14 +101,15 @@ function render() {
   }
 
   const task = state.current;
+  const selection = activeSelection();
   els.emptyState.classList.add("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
-  els.composer.classList.remove("drafting");
-  els.draftControls.classList.add("hidden");
+  els.composer.classList.add("drafting");
+  els.draftControls.classList.remove("hidden");
 
   els.providerBadge.textContent = task.provider === "claude" ? "Claude Code" : "Codex CLI";
-  els.modelBadge.textContent = task.model || "default model";
+  els.modelBadge.textContent = selection.model || providerOptions(task.provider).defaultModel || "default model";
   els.cwdBadge.textContent = task.cwd || "";
   els.promptText.textContent = task.lastPrompt || "";
   els.answerText.textContent = task.answer || "";
@@ -116,11 +118,13 @@ function render() {
   els.continueInput.placeholder = "Type a new request and press Enter. Shift+Enter for newline.";
   els.laterButton.textContent = "Later";
   els.completeButton.textContent = "Done";
+  renderModelOptions();
+  renderEffortOptions();
 }
 
 function renderDraft() {
   const draft = state.draft;
-  const providerOptions = state.options.providers?.[draft.provider] || {};
+  const options = providerOptions(draft.provider);
   els.emptyState.classList.add("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
@@ -128,7 +132,7 @@ function renderDraft() {
   els.draftControls.classList.remove("hidden");
 
   els.providerBadge.textContent = draft.provider === "claude" ? "Claude Code" : "Codex CLI";
-  els.modelBadge.textContent = draft.model || providerOptions.defaultModel || "default model";
+  els.modelBadge.textContent = draft.model || options.defaultModel || "default model";
   els.cwdBadge.textContent = "";
   els.promptText.textContent = draft.prompt || "";
   els.answerText.textContent = "";
@@ -178,16 +182,46 @@ function openDraft(provider = "claude") {
 }
 
 function syncDraftFromControls() {
-  if (!state.draft) return;
-  state.draft.model = els.draftModel.value;
-  state.draft.effort = els.draftEffort.value;
+  if (state.draft) {
+    state.draft.model = els.draftModel.value;
+    state.draft.effort = els.draftEffort.value;
+  } else if (state.current) {
+    state.taskOverrides[state.current.id] = {
+      model: els.draftModel.value,
+      effort: els.draftEffort.value
+    };
+  }
   render();
 }
 
+function providerOptions(provider) {
+  return state.options.providers?.[provider] || {};
+}
+
+function activeSelection() {
+  if (state.draft) {
+    return {
+      provider: state.draft.provider,
+      model: state.draft.model || "",
+      effort: state.draft.effort || ""
+    };
+  }
+  if (state.current) {
+    const override = state.taskOverrides[state.current.id] || {};
+    return {
+      provider: state.current.provider,
+      model: override.model ?? state.current.model ?? "",
+      effort: override.effort ?? state.current.effort ?? ""
+    };
+  }
+  return { provider: "codex", model: "", effort: "" };
+}
+
 function renderModelOptions() {
-  const providerOptions = state.options.providers?.[state.draft.provider] || {};
-  const defaultLabel = providerOptions.defaultModel ? `model: default (${providerOptions.defaultModel})` : "model: default";
-  const models = providerOptions.models || [];
+  const selection = activeSelection();
+  const options = providerOptions(selection.provider);
+  const defaultLabel = options.defaultModel ? `model: default (${options.defaultModel})` : "model: default";
+  const models = options.models || [];
   els.draftModel.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>`;
   for (const model of models) {
     const option = document.createElement("option");
@@ -195,14 +229,15 @@ function renderModelOptions() {
     option.textContent = model.label || model.value;
     els.draftModel.appendChild(option);
   }
-  els.draftModel.value = state.draft.model || "";
+  els.draftModel.value = selection.model || "";
 }
 
 function renderEffortOptions() {
-  const providerOptions = state.options.providers?.[state.draft.provider] || {};
-  const selectedModel = (providerOptions.models || []).find((model) => model.value === state.draft.model);
-  const efforts = selectedModel?.efforts?.length ? selectedModel.efforts : providerOptions.efforts || [];
-  const defaultEffort = selectedModel?.defaultEffort || providerOptions.defaultEffort || "";
+  const selection = activeSelection();
+  const options = providerOptions(selection.provider);
+  const selectedModel = (options.models || []).find((model) => model.value === selection.model);
+  const efforts = selectedModel?.efforts?.length ? selectedModel.efforts : options.efforts || [];
+  const defaultEffort = selectedModel?.defaultEffort || options.defaultEffort || "";
   const defaultLabel = defaultEffort ? `effort: default (${defaultEffort})` : "effort: default";
   els.draftEffort.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>`;
   for (const effort of efforts) {
@@ -211,8 +246,9 @@ function renderEffortOptions() {
     option.textContent = `effort: ${effort}`;
     els.draftEffort.appendChild(option);
   }
-  els.draftEffort.value = efforts.includes(state.draft.effort) ? state.draft.effort : "";
-  state.draft.effort = els.draftEffort.value;
+  els.draftEffort.value = efforts.includes(selection.effort) ? selection.effort : "";
+  if (state.draft) state.draft.effort = els.draftEffort.value;
+  if (state.current && state.taskOverrides[state.current.id]) state.taskOverrides[state.current.id].effort = els.draftEffort.value;
 }
 
 async function startDraft() {
@@ -242,7 +278,9 @@ async function continueCurrent() {
   }
   const prompt = els.continueInput.value.trim();
   if (!state.current || !prompt) return;
-  await cinder.continueTask(state.current.id, prompt);
+  const selection = activeSelection();
+  await cinder.continueTask(state.current.id, { prompt, model: selection.model, effort: selection.effort });
+  delete state.taskOverrides[state.current.id];
   els.continueInput.value = "";
   state.logOpen = false;
   await refresh();
