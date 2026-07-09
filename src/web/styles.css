@@ -112,6 +112,11 @@ h1 {
   overflow: hidden;
 }
 
+.stage.drafting {
+  grid-template-rows: 1fr;
+  align-items: center;
+}
+
 .review-card {
   min-height: 0;
   border: 1px solid var(--line);
@@ -242,6 +247,11 @@ pre {
   min-height: 0;
 }
 
+.stage.drafting .composer {
+  width: min(960px, 100%);
+  justify-self: center;
+}
+
 .input-shell {
   position: relative;
   min-width: 0;
@@ -258,6 +268,11 @@ pre {
   background: #15171d;
   color: var(--text);
   padding: 12px;
+}
+
+.stage.drafting .input-shell textarea {
+  height: 190px;
+  max-height: 240px;
 }
 
 .composer.drafting textarea {

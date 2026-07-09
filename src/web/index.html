@@ -18,20 +18,14 @@
           <button id="runningStat" class="stat" type="button"><span id="runningCount">0</span><small>running</small></button>
           <button id="reviewStat" class="stat active" type="button"><span id="reviewCount">0</span><small>to judge</small></button>
           <button id="shippedStat" class="stat" type="button"><span id="shippedCount">0</span><small>shipped</small></button>
-          <button id="newClaudeButton" class="button agent-button claude">Claude Code</button>
-          <button id="newCodexButton" class="button agent-button codex">Codex</button>
         </div>
       </header>
 
-      <section class="stage">
+      <section id="stage" class="stage">
         <article class="review-card">
           <div id="emptyState" class="empty-state">
             <h2>No cards to judge</h2>
-            <p>Start a Claude Code or Codex task. Finished results will land here.</p>
-            <div class="agent-launchers">
-              <button id="emptyClaudeButton" class="button agent-button claude">Claude Code</button>
-              <button id="emptyCodexButton" class="button agent-button codex">Codex</button>
-            </div>
+            <p>Finished results will land here.</p>
           </div>
 
           <div id="taskView" class="task-view hidden">

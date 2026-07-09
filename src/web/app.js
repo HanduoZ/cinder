@@ -13,12 +13,14 @@ const state = {
 if (state.token) window.localStorage.setItem("cinderToken", state.token);
 
 const els = {
+  stage: document.getElementById("stage"),
   runningStat: document.getElementById("runningStat"),
   reviewStat: document.getElementById("reviewStat"),
   shippedStat: document.getElementById("shippedStat"),
   runningCount: document.getElementById("runningCount"),
   reviewCount: document.getElementById("reviewCount"),
   shippedCount: document.getElementById("shippedCount"),
+  reviewCard: document.querySelector(".review-card"),
   emptyState: document.getElementById("emptyState"),
   taskView: document.getElementById("taskView"),
   composer: document.getElementById("composer"),
@@ -37,11 +39,7 @@ const els = {
   logText: document.getElementById("logText"),
   toggleLogButton: document.getElementById("toggleLogButton"),
   continueInput: document.getElementById("continueInput"),
-  actionButton: document.getElementById("actionButton"),
-  newClaudeButton: document.getElementById("newClaudeButton"),
-  newCodexButton: document.getElementById("newCodexButton"),
-  emptyClaudeButton: document.getElementById("emptyClaudeButton"),
-  emptyCodexButton: document.getElementById("emptyCodexButton")
+  actionButton: document.getElementById("actionButton")
 };
 
 async function api(path, options = {}) {
@@ -111,6 +109,7 @@ function render() {
   els.runningStat.classList.toggle("active", state.view === "running" && !state.draft);
   els.reviewStat.classList.toggle("active", state.view === "review" && !state.draft);
   els.shippedStat.classList.toggle("active", state.view === "done" && !state.draft);
+  els.stage.classList.toggle("drafting", Boolean(state.draft));
 
   if (state.draft) {
     renderDraft();
@@ -118,7 +117,13 @@ function render() {
   }
 
   if (!state.current) {
+    if (state.view === "review") {
+      openDraft({ renderNow: false });
+      renderDraft();
+      return;
+    }
     els.emptyState.classList.remove("hidden");
+    els.reviewCard.classList.remove("hidden");
     els.taskView.classList.add("hidden");
     els.composer.classList.add("hidden");
     els.composer.classList.remove("drafting");
@@ -129,7 +134,9 @@ function render() {
 
   const task = state.current;
   const selection = activeSelection();
+  els.stage.classList.remove("drafting");
   els.emptyState.classList.add("hidden");
+  els.reviewCard.classList.remove("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
   els.composer.classList.add("drafting");
@@ -162,19 +169,10 @@ function renderEmptyState() {
   };
   const descriptions = {
     running: "Running Claude Code and Codex tasks will show up here.",
-    review: "Start a Claude Code or Codex task. Finished results will land here.",
+    review: "Finished results will land here.",
     done: "Cards you mark Done will show up here."
   };
-  const launchers =
-    state.view === "review"
-      ? `<div class="agent-launchers">
-          <button id="emptyClaudeButton" class="button agent-button claude">Claude Code</button>
-          <button id="emptyCodexButton" class="button agent-button codex">Codex</button>
-        </div>`
-      : "";
-  els.emptyState.innerHTML = `<h2>${titles[state.view]}</h2><p>${descriptions[state.view]}</p>${launchers}`;
-  document.getElementById("emptyClaudeButton")?.addEventListener("click", () => openDraft("claude"));
-  document.getElementById("emptyCodexButton")?.addEventListener("click", () => openDraft("codex"));
+  els.emptyState.innerHTML = `<h2>${titles[state.view]}</h2><p>${descriptions[state.view]}</p>`;
 }
 
 function renderDeckControls(queueLength) {
@@ -185,10 +183,10 @@ function renderDeckControls(queueLength) {
 }
 
 function renderDraft() {
-  const draft = state.draft;
-  const options = providerOptions(draft.provider);
+  els.stage.classList.add("drafting");
   els.emptyState.classList.add("hidden");
-  els.taskView.classList.remove("hidden");
+  els.taskView.classList.add("hidden");
+  els.reviewCard.classList.add("hidden");
   els.composer.classList.remove("hidden");
   els.composer.classList.add("drafting");
   els.draftControls.classList.remove("hidden");
@@ -196,14 +194,7 @@ function renderDraft() {
   els.nextCardButton.classList.add("hidden");
   els.deckPosition.textContent = "";
 
-  els.providerBadge.textContent = draft.provider === "claude" ? "Claude Code" : "Codex CLI";
-  els.modelBadge.textContent = draft.model || options.defaultModel || "default model";
-  els.cwdBadge.textContent = "";
-  els.promptText.textContent = draft.prompt || "";
-  els.answerText.textContent = "";
-  els.logText.textContent = "";
-  els.logPanel.classList.toggle("hidden", !state.logOpen);
-  els.continueInput.placeholder = `Tell ${draft.provider === "claude" ? "Claude Code" : "Codex"} what to do. Press Enter to start.`;
+  els.continueInput.placeholder = "Tell Cinder what to run. Press Enter to start.";
   els.actionButton.textContent = "Send";
 
   renderModelOptions();
@@ -230,29 +221,26 @@ async function refreshOptions() {
   }
 }
 
-function openDraft(provider = "claude") {
+function openDraft({ renderNow = true } = {}) {
   state.view = "review";
-  state.draft = {
-    provider: provider === "codex" ? "codex" : "claude",
-    model: "",
-    effort: "",
-    prompt: ""
-  };
+  state.draft = { ...defaultDraft(), prompt: "" };
   els.continueInput.value = "";
-  els.draftModel.value = "";
-  els.draftEffort.value = "";
   state.logOpen = false;
-  render();
-  els.continueInput.focus();
+  if (renderNow) {
+    render();
+    els.continueInput.focus();
+  }
 }
 
 function syncDraftFromControls() {
+  const modelSelection = decodeModelValue(els.draftModel.value) || defaultDraft();
   if (state.draft) {
-    state.draft.model = els.draftModel.value;
+    state.draft.provider = modelSelection.provider;
+    state.draft.model = modelSelection.model;
     state.draft.effort = els.draftEffort.value;
   } else if (state.current) {
     state.taskOverrides[state.current.id] = {
-      model: els.draftModel.value,
+      model: modelSelection.model,
       effort: els.draftEffort.value
     };
   }
@@ -261,6 +249,34 @@ function syncDraftFromControls() {
 
 function providerOptions(provider) {
   return state.options.providers?.[provider] || {};
+}
+
+function providerLabel(provider) {
+  return provider === "claude" ? "Claude Code" : "Codex CLI";
+}
+
+function encodeModelValue(provider, model) {
+  return JSON.stringify({ provider, model: model || "" });
+}
+
+function decodeModelValue(value) {
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed?.provider) return null;
+    return { provider: parsed.provider === "claude" ? "claude" : "codex", model: parsed.model || "" };
+  } catch {
+    return null;
+  }
+}
+
+function providerHasModels(provider) {
+  const options = providerOptions(provider);
+  return Boolean(options.defaultModel || options.models?.length);
+}
+
+function defaultDraft() {
+  const provider = providerHasModels("codex") || !providerHasModels("claude") ? "codex" : "claude";
+  return { provider, model: "", effort: "" };
 }
 
 function activeSelection() {
@@ -284,17 +300,23 @@ function activeSelection() {
 
 function renderModelOptions() {
   const selection = activeSelection();
-  const options = providerOptions(selection.provider);
-  const defaultLabel = options.defaultModel ? `model: default (${options.defaultModel})` : "model: default";
-  const models = options.models || [];
-  els.draftModel.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>`;
-  for (const model of models) {
+  const choices = modelChoices(state.draft ? null : selection.provider, selection);
+  els.draftModel.innerHTML = "";
+  for (const choice of choices) {
     const option = document.createElement("option");
-    option.value = model.value;
-    option.textContent = model.label || model.value;
+    option.value = encodeModelValue(choice.provider, choice.model);
+    option.textContent = choice.label;
     els.draftModel.appendChild(option);
   }
-  els.draftModel.value = selection.model || "";
+  const selectedValue = encodeModelValue(selection.provider, selection.model);
+  els.draftModel.value = choices.some((choice) => encodeModelValue(choice.provider, choice.model) === selectedValue)
+    ? selectedValue
+    : els.draftModel.options[0]?.value || "";
+  const applied = decodeModelValue(els.draftModel.value);
+  if (state.draft && applied) {
+    state.draft.provider = applied.provider;
+    state.draft.model = applied.model;
+  }
 }
 
 function renderEffortOptions() {
@@ -316,6 +338,39 @@ function renderEffortOptions() {
   if (state.current && state.taskOverrides[state.current.id]) state.taskOverrides[state.current.id].effort = els.draftEffort.value;
 }
 
+function modelChoices(providerFilter, selection) {
+  const providers = providerFilter ? [providerFilter] : ["codex", "claude"];
+  const choices = [];
+  for (const provider of providers) {
+    const options = providerOptions(provider);
+    const models = options.models || [];
+    if (options.defaultModel || (providerFilter && !models.length)) {
+      const suffix = options.defaultModel ? `default (${options.defaultModel})` : "default";
+      choices.push({ provider, model: "", label: `${providerLabel(provider)} · ${suffix}` });
+    }
+    for (const model of models) {
+      choices.push({
+        provider,
+        model: model.value,
+        label: `${providerLabel(provider)} · ${model.label || model.value}`
+      });
+    }
+  }
+
+  if (selection?.model && !choices.some((choice) => choice.provider === selection.provider && choice.model === selection.model)) {
+    choices.unshift({
+      provider: selection.provider,
+      model: selection.model,
+      label: `${providerLabel(selection.provider)} · ${selection.model}`
+    });
+  }
+
+  if (!choices.length) {
+    choices.push({ provider: "codex", model: "", label: "Codex CLI · default" });
+  }
+  return choices;
+}
+
 async function startDraft() {
   if (!state.draft) return;
   syncDraftFromControls();
@@ -331,9 +386,10 @@ async function startDraft() {
 
   await cinder.createTask(payload);
 
-  state.draft = null;
+  state.draft = defaultDraft();
   els.continueInput.value = "";
   await refresh();
+  els.continueInput.focus();
 }
 
 async function continueCurrent() {
@@ -377,10 +433,6 @@ function moveDeck(delta) {
   render();
 }
 
-els.newClaudeButton.addEventListener("click", () => openDraft("claude"));
-els.newCodexButton.addEventListener("click", () => openDraft("codex"));
-els.emptyClaudeButton?.addEventListener("click", () => openDraft("claude"));
-els.emptyCodexButton?.addEventListener("click", () => openDraft("codex"));
 els.runningStat.addEventListener("click", () => switchView("running"));
 els.reviewStat.addEventListener("click", () => switchView("review"));
 els.shippedStat.addEventListener("click", () => switchView("done"));
