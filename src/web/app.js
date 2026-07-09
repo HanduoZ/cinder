@@ -1,7 +1,6 @@
 const state = {
   tasks: [],
   current: null,
-  selectedResumeTask: null,
   draft: null,
   logOpen: false,
   token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
@@ -12,6 +11,7 @@ if (state.token) window.localStorage.setItem("cinderToken", state.token);
 const els = {
   runningCount: document.getElementById("runningCount"),
   reviewCount: document.getElementById("reviewCount"),
+  shippedCount: document.getElementById("shippedCount"),
   emptyState: document.getElementById("emptyState"),
   taskView: document.getElementById("taskView"),
   composer: document.getElementById("composer"),
@@ -20,15 +20,9 @@ const els = {
   cwdBadge: document.getElementById("cwdBadge"),
   promptText: document.getElementById("promptText"),
   answerText: document.getElementById("answerText"),
-  draftSettings: document.getElementById("draftSettings"),
-  draftProvider: document.getElementById("draftProvider"),
-  draftCwd: document.getElementById("draftCwd"),
+  draftControls: document.getElementById("draftControls"),
   draftModel: document.getElementById("draftModel"),
   draftEffort: document.getElementById("draftEffort"),
-  draftPermission: document.getElementById("draftPermission"),
-  draftApproval: document.getElementById("draftApproval"),
-  draftClaudePermissionLabel: document.getElementById("draftClaudePermissionLabel"),
-  draftCodexApprovalLabel: document.getElementById("draftCodexApprovalLabel"),
   logPanel: document.getElementById("logPanel"),
   logText: document.getElementById("logText"),
   toggleLogButton: document.getElementById("toggleLogButton"),
@@ -38,9 +32,7 @@ const els = {
   newClaudeButton: document.getElementById("newClaudeButton"),
   newCodexButton: document.getElementById("newCodexButton"),
   emptyClaudeButton: document.getElementById("emptyClaudeButton"),
-  emptyCodexButton: document.getElementById("emptyCodexButton"),
-  searchInput: document.getElementById("searchInput"),
-  searchResults: document.getElementById("searchResults")
+  emptyCodexButton: document.getElementById("emptyCodexButton")
 };
 
 async function api(path, options = {}) {
@@ -77,13 +69,19 @@ function runningTasks() {
   return state.tasks.filter((task) => task.status === "running");
 }
 
+function shippedTasks() {
+  return state.tasks.filter((task) => task.status === "done");
+}
+
 function render() {
   const review = reviewQueue();
   const running = runningTasks();
+  const shipped = shippedTasks();
   state.current = state.draft ? null : review[0] || null;
 
   els.runningCount.textContent = String(running.length);
   els.reviewCount.textContent = String(review.length);
+  els.shippedCount.textContent = String(shipped.length);
 
   if (state.draft) {
     renderDraft();
@@ -94,7 +92,8 @@ function render() {
     els.emptyState.classList.remove("hidden");
     els.taskView.classList.add("hidden");
     els.composer.classList.add("hidden");
-    els.draftSettings.classList.add("hidden");
+    els.composer.classList.remove("drafting");
+    els.draftControls.classList.add("hidden");
     return;
   }
 
@@ -102,7 +101,8 @@ function render() {
   els.emptyState.classList.add("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
-  els.draftSettings.classList.add("hidden");
+  els.composer.classList.remove("drafting");
+  els.draftControls.classList.add("hidden");
 
   els.providerBadge.textContent = task.provider === "claude" ? "Claude Code" : "Codex CLI";
   els.modelBadge.textContent = task.model || "default model";
@@ -121,11 +121,12 @@ function renderDraft() {
   els.emptyState.classList.add("hidden");
   els.taskView.classList.remove("hidden");
   els.composer.classList.remove("hidden");
-  els.draftSettings.classList.remove("hidden");
+  els.composer.classList.add("drafting");
+  els.draftControls.classList.remove("hidden");
 
   els.providerBadge.textContent = draft.provider === "claude" ? "Claude Code" : "Codex CLI";
   els.modelBadge.textContent = draft.model || "default model";
-  els.cwdBadge.textContent = draft.cwd || "";
+  els.cwdBadge.textContent = "";
   els.promptText.textContent = draft.prompt || "";
   els.answerText.textContent = "";
   els.logText.textContent = "";
@@ -134,14 +135,8 @@ function renderDraft() {
   els.laterButton.textContent = "Cancel";
   els.completeButton.textContent = "Start";
 
-  els.draftProvider.value = draft.provider;
-  els.draftCwd.value = draft.cwd || "";
   els.draftModel.value = draft.model || "";
   els.draftEffort.value = draft.effort || "";
-  els.draftPermission.value = draft.permission || "";
-  els.draftApproval.value = draft.approval || "on-request";
-  els.draftClaudePermissionLabel.classList.toggle("hidden", draft.provider !== "claude");
-  els.draftCodexApprovalLabel.classList.toggle("hidden", draft.provider !== "codex");
 }
 
 async function refresh() {
@@ -157,18 +152,15 @@ async function refresh() {
 }
 
 function openDraft(provider = "claude") {
-  state.selectedResumeTask = null;
   state.draft = {
     provider: provider === "codex" ? "codex" : "claude",
     model: "",
     effort: "",
-    permission: "",
-    approval: "on-request",
-    cwd: "",
     prompt: ""
   };
-  els.searchResults.innerHTML = "";
   els.continueInput.value = "";
+  els.draftModel.value = "";
+  els.draftEffort.value = "";
   state.logOpen = false;
   render();
   els.continueInput.focus();
@@ -176,12 +168,8 @@ function openDraft(provider = "claude") {
 
 function syncDraftFromControls() {
   if (!state.draft) return;
-  state.draft.provider = els.draftProvider.value === "codex" ? "codex" : "claude";
-  state.draft.cwd = els.draftCwd.value.trim();
   state.draft.model = els.draftModel.value.trim();
   state.draft.effort = els.draftEffort.value;
-  state.draft.permission = els.draftPermission.value;
-  state.draft.approval = els.draftApproval.value;
   render();
 }
 
@@ -195,17 +183,10 @@ async function startDraft() {
     provider: state.draft.provider,
     model: state.draft.model,
     effort: state.draft.effort,
-    permission: state.draft.permission,
-    approval: state.draft.approval,
-    cwd: state.draft.cwd || undefined,
     prompt
   };
 
-  if (state.selectedResumeTask) {
-    await cinder.resumeTask(state.selectedResumeTask.id, payload.prompt);
-  } else {
-    await cinder.createTask(payload);
-  }
+  await cinder.createTask(payload);
 
   state.draft = null;
   els.continueInput.value = "";
@@ -250,26 +231,6 @@ async function completeCurrent() {
   await refresh();
 }
 
-async function searchCompleted() {
-  const results = await cinder.searchTasks(els.searchInput.value);
-  els.searchResults.innerHTML = "";
-  for (const task of results) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "search-result";
-    item.innerHTML = `<strong>${escapeHtml(firstLine(task.lastPrompt))}</strong><span>${escapeHtml(task.provider)} - ${escapeHtml(task.cwd || "")}</span>`;
-    item.addEventListener("click", () => {
-      state.selectedResumeTask = task;
-      els.searchResults.innerHTML = `<div class="search-result"><strong>Resume selected</strong><span>${escapeHtml(firstLine(task.lastPrompt))}</span></div>`;
-    });
-    els.searchResults.appendChild(item);
-  }
-}
-
-function firstLine(text) {
-  return String(text || "").split("\n").find(Boolean)?.slice(0, 140) || "Untitled task";
-}
-
 function escapeHtml(text) {
   return String(text)
     .replaceAll("&", "&amp;")
@@ -283,19 +244,14 @@ els.newClaudeButton.addEventListener("click", () => openDraft("claude"));
 els.newCodexButton.addEventListener("click", () => openDraft("codex"));
 els.emptyClaudeButton.addEventListener("click", () => openDraft("claude"));
 els.emptyCodexButton.addEventListener("click", () => openDraft("codex"));
-els.draftProvider.addEventListener("change", syncDraftFromControls);
-els.draftCwd.addEventListener("input", syncDraftFromControls);
 els.draftModel.addEventListener("input", syncDraftFromControls);
 els.draftEffort.addEventListener("change", syncDraftFromControls);
-els.draftPermission.addEventListener("change", syncDraftFromControls);
-els.draftApproval.addEventListener("change", syncDraftFromControls);
 els.laterButton.addEventListener("click", laterCurrent);
 els.completeButton.addEventListener("click", completeCurrent);
 els.toggleLogButton.addEventListener("click", () => {
   state.logOpen = !state.logOpen;
   render();
 });
-els.searchInput.addEventListener("input", searchCompleted);
 els.continueInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();

@@ -17,6 +17,7 @@
         <div class="topbar-actions">
           <div class="stat"><span id="runningCount">0</span><small>running</small></div>
           <div class="stat active"><span id="reviewCount">0</span><small>to judge</small></div>
+          <div class="stat"><span id="shippedCount">0</span><small>shipped</small></div>
           <button id="newClaudeButton" class="button agent-button claude">Claude Code</button>
           <button id="newCodexButton" class="button agent-button codex">Codex</button>
         </div>
@@ -40,62 +41,6 @@
               <span id="cwdBadge" class="muted"></span>
             </div>
 
-            <details id="draftSettings" class="draft-settings hidden">
-              <summary>Settings</summary>
-              <div class="draft-grid">
-                <label>
-                  Agent
-                  <select id="draftProvider">
-                    <option value="claude">Claude Code</option>
-                    <option value="codex">Codex</option>
-                  </select>
-                </label>
-                <label>
-                  Project
-                  <input id="draftCwd" placeholder="/Users/handuo/project" />
-                </label>
-                <label>
-                  Model
-                  <input id="draftModel" placeholder="sonnet, opus, gpt-5.5..." />
-                </label>
-                <label>
-                  Effort
-                  <select id="draftEffort">
-                    <option value="">default</option>
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="xhigh">xhigh</option>
-                    <option value="max">max</option>
-                  </select>
-                </label>
-                <label id="draftClaudePermissionLabel">
-                  Claude permission
-                  <select id="draftPermission">
-                    <option value="">default</option>
-                    <option value="auto">auto</option>
-                    <option value="acceptEdits">acceptEdits</option>
-                    <option value="manual">manual</option>
-                    <option value="plan">plan</option>
-                    <option value="bypassPermissions">bypassPermissions</option>
-                  </select>
-                </label>
-                <label id="draftCodexApprovalLabel">
-                  Codex approval
-                  <select id="draftApproval">
-                    <option value="on-request">on-request</option>
-                    <option value="untrusted">untrusted</option>
-                    <option value="never">never</option>
-                  </select>
-                </label>
-              </div>
-              <details class="resume-box">
-                <summary>Resume a completed task</summary>
-                <input id="searchInput" placeholder="Search completed tasks..." />
-                <div id="searchResults" class="search-results"></div>
-              </details>
-            </details>
-
             <section class="panel context-panel">
               <h2>Last request</h2>
               <pre id="promptText"></pre>
@@ -117,7 +62,20 @@
         </article>
 
         <section id="composer" class="composer hidden">
-          <textarea id="continueInput" placeholder="Type a new request and press Enter. Shift+Enter for newline."></textarea>
+          <div class="input-shell">
+            <textarea id="continueInput" placeholder="Type a new request and press Enter. Shift+Enter for newline."></textarea>
+            <div id="draftControls" class="draft-controls hidden">
+              <input id="draftModel" class="compact-control" placeholder="model: default" />
+              <select id="draftEffort" class="compact-control">
+                <option value="">effort: default</option>
+                <option value="low">effort: low</option>
+                <option value="medium">effort: medium</option>
+                <option value="high">effort: high</option>
+                <option value="xhigh">effort: xhigh</option>
+                <option value="max">effort: max</option>
+              </select>
+            </div>
+          </div>
           <div class="composer-actions">
             <button id="laterButton" class="button">Later</button>
             <button id="completeButton" class="button success">Done</button>
