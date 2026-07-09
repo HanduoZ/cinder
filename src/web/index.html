@@ -15,9 +15,9 @@
           <p>Swipe through finished agent work.</p>
         </div>
         <div class="topbar-actions">
-          <div class="stat"><span id="runningCount">0</span><small>running</small></div>
-          <div class="stat active"><span id="reviewCount">0</span><small>to judge</small></div>
-          <div class="stat"><span id="shippedCount">0</span><small>shipped</small></div>
+          <button id="runningStat" class="stat" type="button"><span id="runningCount">0</span><small>running</small></button>
+          <button id="reviewStat" class="stat active" type="button"><span id="reviewCount">0</span><small>to judge</small></button>
+          <button id="shippedStat" class="stat" type="button"><span id="shippedCount">0</span><small>shipped</small></button>
           <button id="newClaudeButton" class="button agent-button claude">Claude Code</button>
           <button id="newCodexButton" class="button agent-button codex">Codex</button>
         </div>
@@ -39,6 +39,10 @@
               <span id="providerBadge" class="badge">agent</span>
               <span id="modelBadge" class="muted"></span>
               <span id="cwdBadge" class="muted"></span>
+              <span class="task-meta-spacer"></span>
+              <button id="previousCardButton" class="button subtle deck-button" type="button">Prev</button>
+              <span id="deckPosition" class="muted deck-position"></span>
+              <button id="nextCardButton" class="button subtle deck-button" type="button">Next</button>
             </div>
 
             <section class="panel context-panel">

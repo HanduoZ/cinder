@@ -4,6 +4,8 @@ const state = {
   draft: null,
   options: { providers: {} },
   taskOverrides: {},
+  view: "review",
+  indices: { running: 0, review: 0, done: 0 },
   logOpen: false,
   token: new URLSearchParams(window.location.search).get("token") || window.localStorage.getItem("cinderToken") || ""
 };
@@ -11,6 +13,9 @@ const state = {
 if (state.token) window.localStorage.setItem("cinderToken", state.token);
 
 const els = {
+  runningStat: document.getElementById("runningStat"),
+  reviewStat: document.getElementById("reviewStat"),
+  shippedStat: document.getElementById("shippedStat"),
   runningCount: document.getElementById("runningCount"),
   reviewCount: document.getElementById("reviewCount"),
   shippedCount: document.getElementById("shippedCount"),
@@ -20,6 +25,9 @@ const els = {
   providerBadge: document.getElementById("providerBadge"),
   modelBadge: document.getElementById("modelBadge"),
   cwdBadge: document.getElementById("cwdBadge"),
+  previousCardButton: document.getElementById("previousCardButton"),
+  deckPosition: document.getElementById("deckPosition"),
+  nextCardButton: document.getElementById("nextCardButton"),
   promptText: document.getElementById("promptText"),
   answerText: document.getElementById("answerText"),
   draftControls: document.getElementById("draftControls"),
@@ -76,15 +84,34 @@ function shippedTasks() {
   return state.tasks.filter((task) => task.status === "done");
 }
 
+function queueForView(view = state.view) {
+  if (view === "running") return runningTasks();
+  if (view === "done") return shippedTasks();
+  return reviewQueue();
+}
+
+function clampIndex(view) {
+  const queue = queueForView(view);
+  const max = Math.max(0, queue.length - 1);
+  state.indices[view] = Math.min(Math.max(0, state.indices[view] || 0), max);
+}
+
 function render() {
   const review = reviewQueue();
   const running = runningTasks();
   const shipped = shippedTasks();
-  state.current = state.draft ? null : review[0] || null;
+  clampIndex("running");
+  clampIndex("review");
+  clampIndex("done");
+  const activeQueue = queueForView();
+  state.current = state.draft ? null : activeQueue[state.indices[state.view]] || null;
 
   els.runningCount.textContent = String(running.length);
   els.reviewCount.textContent = String(review.length);
   els.shippedCount.textContent = String(shipped.length);
+  els.runningStat.classList.toggle("active", state.view === "running" && !state.draft);
+  els.reviewStat.classList.toggle("active", state.view === "review" && !state.draft);
+  els.shippedStat.classList.toggle("active", state.view === "done" && !state.draft);
 
   if (state.draft) {
     renderDraft();
@@ -97,6 +124,7 @@ function render() {
     els.composer.classList.add("hidden");
     els.composer.classList.remove("drafting");
     els.draftControls.classList.add("hidden");
+    renderEmptyState();
     return;
   }
 
@@ -107,6 +135,7 @@ function render() {
   els.composer.classList.remove("hidden");
   els.composer.classList.add("drafting");
   els.draftControls.classList.remove("hidden");
+  renderDeckControls(activeQueue.length);
 
   els.providerBadge.textContent = task.provider === "claude" ? "Claude Code" : "Codex CLI";
   els.modelBadge.textContent = selection.model || providerOptions(task.provider).defaultModel || "default model";
@@ -115,11 +144,46 @@ function render() {
   els.answerText.textContent = task.answer || "";
   els.logText.textContent = task.log || "";
   els.logPanel.classList.toggle("hidden", !state.logOpen);
-  els.continueInput.placeholder = "Type a new request and press Enter. Shift+Enter for newline.";
-  els.laterButton.textContent = "Later";
-  els.completeButton.textContent = "Done";
+  if (state.view === "review") {
+    els.composer.classList.remove("hidden");
+    els.continueInput.placeholder = "Type a new request and press Enter. Shift+Enter for newline.";
+    els.laterButton.textContent = "Later";
+    els.completeButton.textContent = "Done";
+  } else {
+    els.composer.classList.add("hidden");
+  }
   renderModelOptions();
   renderEffortOptions();
+}
+
+function renderEmptyState() {
+  const titles = {
+    running: "No running cards",
+    review: "No cards to judge",
+    done: "No shipped cards"
+  };
+  const descriptions = {
+    running: "Running Claude Code and Codex tasks will show up here.",
+    review: "Start a Claude Code or Codex task. Finished results will land here.",
+    done: "Cards you mark Done will show up here."
+  };
+  const launchers =
+    state.view === "review"
+      ? `<div class="agent-launchers">
+          <button id="emptyClaudeButton" class="button agent-button claude">Claude Code</button>
+          <button id="emptyCodexButton" class="button agent-button codex">Codex</button>
+        </div>`
+      : "";
+  els.emptyState.innerHTML = `<h2>${titles[state.view]}</h2><p>${descriptions[state.view]}</p>${launchers}`;
+  document.getElementById("emptyClaudeButton")?.addEventListener("click", () => openDraft("claude"));
+  document.getElementById("emptyCodexButton")?.addEventListener("click", () => openDraft("codex"));
+}
+
+function renderDeckControls(queueLength) {
+  const index = state.indices[state.view] || 0;
+  els.deckPosition.textContent = queueLength > 1 ? `${index + 1} / ${queueLength}` : "";
+  els.previousCardButton.classList.toggle("hidden", queueLength < 2);
+  els.nextCardButton.classList.toggle("hidden", queueLength < 2);
 }
 
 function renderDraft() {
@@ -130,6 +194,9 @@ function renderDraft() {
   els.composer.classList.remove("hidden");
   els.composer.classList.add("drafting");
   els.draftControls.classList.remove("hidden");
+  els.previousCardButton.classList.add("hidden");
+  els.nextCardButton.classList.add("hidden");
+  els.deckPosition.textContent = "";
 
   els.providerBadge.textContent = draft.provider === "claude" ? "Claude Code" : "Codex CLI";
   els.modelBadge.textContent = draft.model || options.defaultModel || "default model";
@@ -167,6 +234,7 @@ async function refreshOptions() {
 }
 
 function openDraft(provider = "claude") {
+  state.view = "review";
   state.draft = {
     provider: provider === "codex" ? "codex" : "claude",
     model: "",
@@ -276,6 +344,7 @@ async function continueCurrent() {
     await startDraft();
     return;
   }
+  if (state.view !== "review") return;
   const prompt = els.continueInput.value.trim();
   if (!state.current || !prompt) return;
   const selection = activeSelection();
@@ -294,6 +363,7 @@ async function laterCurrent() {
     render();
     return;
   }
+  if (state.view !== "review") return;
   if (!state.current) return;
   await cinder.laterTask(state.current.id);
   state.logOpen = false;
@@ -305,6 +375,7 @@ async function completeCurrent() {
     await startDraft();
     return;
   }
+  if (state.view !== "review") return;
   if (!state.current) return;
   await cinder.completeTask(state.current.id);
   state.logOpen = false;
@@ -320,10 +391,31 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
+function switchView(view) {
+  state.draft = null;
+  state.view = view;
+  state.logOpen = false;
+  els.continueInput.value = "";
+  render();
+}
+
+function moveDeck(delta) {
+  const queue = queueForView();
+  if (queue.length < 2) return;
+  state.indices[state.view] = (state.indices[state.view] + delta + queue.length) % queue.length;
+  state.logOpen = false;
+  render();
+}
+
 els.newClaudeButton.addEventListener("click", () => openDraft("claude"));
 els.newCodexButton.addEventListener("click", () => openDraft("codex"));
-els.emptyClaudeButton.addEventListener("click", () => openDraft("claude"));
-els.emptyCodexButton.addEventListener("click", () => openDraft("codex"));
+els.emptyClaudeButton?.addEventListener("click", () => openDraft("claude"));
+els.emptyCodexButton?.addEventListener("click", () => openDraft("codex"));
+els.runningStat.addEventListener("click", () => switchView("running"));
+els.reviewStat.addEventListener("click", () => switchView("review"));
+els.shippedStat.addEventListener("click", () => switchView("done"));
+els.previousCardButton.addEventListener("click", () => moveDeck(-1));
+els.nextCardButton.addEventListener("click", () => moveDeck(1));
 els.draftModel.addEventListener("change", syncDraftFromControls);
 els.draftEffort.addEventListener("change", syncDraftFromControls);
 els.laterButton.addEventListener("click", laterCurrent);

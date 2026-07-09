@@ -77,6 +77,9 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
 }
 
 .stat span {
@@ -91,6 +94,10 @@ h1 {
 
 .stat.active {
   border-color: rgba(255, 107, 74, 0.45);
+}
+
+.stat:hover {
+  border-color: #565b66;
 }
 
 .stage {
@@ -148,6 +155,20 @@ h1 {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.task-meta-spacer {
+  flex: 1;
+}
+
+.deck-position {
+  min-width: 44px;
+  text-align: center;
+}
+
+.deck-button {
+  min-height: 28px;
+  padding: 4px 8px;
 }
 
 .badge {
