@@ -38,9 +38,27 @@ cinder host --lan
 
 Open the printed Phone/iPad URL on the device.
 
-## Current MVP
+## Native iOS app
+
+Cinder also includes a native SwiftUI iOS app for iPhone and iPad. It connects to the Cinder host on your Mac, then gives you the mobile-first card flow:
+
+- swipe left/right to move through active cards
+- swipe up to suspend a card
+- type and send to continue the current card
+- approve completed cards
+- review running cards as live process output
+
+```sh
+cinder host --lan
+cinder ios
+```
+
+The iOS target supports iOS 15.0 and newer, including iPhone 7 Plus on iOS 15.8.8. To install on a physical iPhone, open the project from `cinder ios`, pick your connected iPhone in Xcode, select a signing team, and Run.
+
+## Current app
 
 - Local Mac host with browser/PWA UI.
+- Native iOS SwiftUI client.
 - Supports Claude Code and Codex CLI.
 - Starts new local CLI tasks.
 - Captures stdout and stderr.

@@ -18,6 +18,7 @@ Usage:
   cinder                 Start Cinder on this Mac and open the local UI
   cinder host            Start Cinder host
   cinder host --lan      Start Cinder host on your LAN for iPhone/iPad
+  cinder ios             Open the native iOS app project
   cinder doctor          Check local setup
   cinder logs            Print local task database path
   cinder install-ponytail Install Ponytail for Claude Code and Codex
@@ -110,6 +111,35 @@ function logs() {
   console.log(path.join(os.homedir(), ".cinder/tasks.json"));
 }
 
+async function ios() {
+  const projectPath = path.join(rootDir, "ios", "Cinder", "Cinder.xcodeproj");
+  if (!fs.existsSync(projectPath)) {
+    console.error(`Missing iOS project: ${projectPath}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log("Cinder iOS\n");
+  try {
+    const response = await fetch("http://127.0.0.1:3737/api/status");
+    if (response.ok) {
+      const status = await response.json();
+      console.log(`Phone/iPad URL: ${status.lanUrl}`);
+    } else {
+      console.log("Phone/iPad URL: start Cinder on this Mac with `cinder host --lan`.");
+    }
+  } catch {
+    console.log("Phone/iPad URL: start Cinder on this Mac with `cinder host --lan`.");
+  }
+
+  console.log(`Project: ${projectPath}`);
+  console.log("Connect your iPhone, trust this Mac, select the iPhone in Xcode, then Run.");
+
+  if (process.platform === "darwin") {
+    spawn("open", [projectPath], { detached: true, stdio: "ignore" }).unref();
+  }
+}
+
 function installPonytail() {
   const commands = [
     ["claude", ["plugin", "marketplace", "add", "https://github.com/DietrichGebert/ponytail"]],
@@ -140,6 +170,12 @@ switch (command) {
     break;
   case "logs":
     logs();
+    break;
+  case "ios":
+    ios().catch((error) => {
+      console.error(`Failed to open iOS project: ${error.message}`);
+      process.exitCode = 1;
+    });
     break;
   case "install-ponytail":
     installPonytail();
