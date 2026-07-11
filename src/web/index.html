@@ -17,8 +17,8 @@
           <p data-i18n="tagline">Swipe through finished agent work.</p>
         </div>
         <div class="topbar-actions">
-          <button id="runningStat" class="stat" type="button"><span id="runningCount">0</span><small data-i18n="running">running</small></button>
-          <button id="reviewStat" class="stat active" type="button"><span id="reviewCount">0</span><small data-i18n="toJudge">to judge</small></button>
+          <button id="reviewStat" class="stat active" type="button"><span id="reviewCount">0</span><small data-i18n="active">active</small></button>
+          <button id="runningStat" class="stat" type="button"><span id="runningCount">0</span><small data-i18n="suspended">suspended</small></button>
           <button id="shippedStat" class="stat" type="button"><span id="shippedCount">0</span><small data-i18n="shipped">shipped</small></button>
           <button id="settingsButton" class="button subtle" type="button" data-i18n="settings">Settings</button>
         </div>
@@ -27,16 +27,12 @@
       <section id="stage" class="stage">
         <article class="review-card">
           <div id="emptyState" class="empty-state">
-            <h2 data-i18n="emptyReviewTitle">No cards to judge</h2>
-            <p data-i18n="emptyReviewDescription">Finished results will land here.</p>
+            <h2 data-i18n="emptyActiveTitle">No active cards</h2>
+            <p data-i18n="emptyActiveDescription">Start a task or wait for agent work to come back.</p>
           </div>
 
           <div id="taskView" class="task-view hidden">
             <div class="task-meta">
-              <span id="providerBadge" class="badge">agent</span>
-              <span id="modelBadge" class="muted"></span>
-              <span id="cwdBadge" class="muted"></span>
-              <span class="task-meta-spacer"></span>
               <button id="previousCardButton" class="button subtle deck-button" type="button" data-i18n="prev">Prev</button>
               <span id="deckPosition" class="muted deck-position"></span>
               <button id="nextCardButton" class="button subtle deck-button" type="button" data-i18n="next">Next</button>
@@ -54,7 +50,6 @@
               </div>
               <pre id="answerText"></pre>
               <div id="answerActions" class="answer-actions hidden">
-                <button id="laterButton" class="button primary" type="button" data-i18n="suspend">Suspend</button>
                 <button id="approveButton" class="button success" type="button" data-i18n="approve">Approve</button>
               </div>
             </section>

@@ -288,7 +288,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.npm-global
 export NO_PROXY="127.0.0.1,localhost,::1,\${NO_PROXY:-}"
 export no_proxy="127.0.0.1,localhost,::1,\${no_proxy:-}"
 
-exec /usr/bin/env node "$ROOT_DIR/bin/cinder.js" host --no-open >> "$LOG_FILE" 2>&1
+exec /usr/bin/env node "$ROOT_DIR/bin/cinder.js" host --lan --no-open >> "$LOG_FILE" 2>&1
 `
 );
 fs.chmodSync(startHostPath, 0o755);

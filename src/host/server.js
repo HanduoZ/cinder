@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 const webDir = path.join(rootDir, "src/web");
-const dataDir = path.join(os.homedir(), ".cinder");
+const dataDir = process.env.CINDER_DATA_DIR || path.join(os.homedir(), ".cinder");
 const dbPath = path.join(dataDir, "tasks.json");
 const configPath = path.join(dataDir, "config.json");
 const attachmentsDir = path.join(dataDir, "attachments");
@@ -157,6 +157,14 @@ function updateTask(taskId, updater) {
   return task;
 }
 
+function moveTaskToEnd(db, taskId) {
+  const index = db.tasks.findIndex((task) => task.id === taskId);
+  if (index === -1) return null;
+  const [task] = db.tasks.splice(index, 1);
+  db.tasks.push(task);
+  return task;
+}
+
 function imageExtension(type, name = "") {
   const ext = path.extname(name).toLowerCase();
   if ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext)) return ext;
@@ -206,7 +214,7 @@ function createTask(input) {
     commandPreview: ""
   };
   const imagePaths = saveImages(task.id, input.images);
-  db.tasks.unshift(task);
+  db.tasks.push(task);
   writeDb(db);
   runTask(task, task.lastPrompt, imagePaths);
   return task;
@@ -259,10 +267,10 @@ function buildContinuationPrompt(task, prompt, previousPrompt = task.lastPrompt)
 }
 
 function queueContinuation(task, prompt, input, imagePaths) {
-  const queuedContinuations = Array.isArray(task.queuedContinuations) ? task.queuedContinuations : [];
-  const previousPrompt = queuedContinuations.length
-    ? queuedContinuations[queuedContinuations.length - 1].prompt
-    : task.lastPrompt;
+  const db = readDb();
+  const current = db.tasks.find((item) => item.id === task.id) || task;
+  const queuedContinuations = Array.isArray(current.queuedContinuations) ? current.queuedContinuations : [];
+  const previousPrompt = queuedContinuations.length ? queuedContinuations[queuedContinuations.length - 1].prompt : current.lastPrompt;
   const queued = {
     prompt: prompt.trim(),
     previousPrompt,
@@ -271,12 +279,13 @@ function queueContinuation(task, prompt, input, imagePaths) {
     imagePaths,
     createdAt: now()
   };
-  const updated = updateTask(task.id, (item) => {
-    item.queuedContinuations = [...(Array.isArray(item.queuedContinuations) ? item.queuedContinuations : []), queued];
-    item.lastPrompt = queued.prompt;
-    item.log += `\n[queued continuation] ${queued.prompt}\n`;
-  });
-  return updated;
+  current.queuedContinuations = queuedContinuations.concat(queued);
+  current.lastPrompt = queued.prompt;
+  current.log += `\n[queued continuation] ${queued.prompt}\n`;
+  current.updatedAt = now();
+  moveTaskToEnd(db, task.id);
+  writeDb(db);
+  return current;
 }
 
 function startNextQueuedContinuation(taskId) {
@@ -340,6 +349,8 @@ function runTask(task, prompt, images = []) {
   child.on("close", (code) => {
     activeProcesses.delete(task.id);
     const answer = stdout.trim() || stderr.trim() || `(No output. Exit code: ${code})`;
+    const latest = readDb().tasks.find((item) => item.id === task.id);
+    if (latest?.status === "done" || latest?.status === "suspended") return;
     updateTask(task.id, (item) => {
       item.status = "review";
       item.answer = answer;
@@ -366,18 +377,25 @@ function continueTask(taskId, prompt, input = {}) {
     item.status = "running";
   });
   if (!task) throw new Error("Task not found.");
+  const db = readDb();
+  moveTaskToEnd(db, taskId);
+  writeDb(db);
   runTask(task, continuationPrompt, imagePaths);
   return task;
 }
 
 function laterTask(taskId) {
   const db = readDb();
-  const index = db.tasks.findIndex((task) => task.id === taskId);
-  if (index === -1) throw new Error("Task not found.");
-  const [task] = db.tasks.splice(index, 1);
+  const task = moveTaskToEnd(db, taskId);
+  if (!task) throw new Error("Task not found.");
+  const child = activeProcesses.get(taskId);
+  if (child) {
+    activeProcesses.delete(taskId);
+    child.kill();
+  }
+  task.status = "suspended";
   task.deferredCount += 1;
   task.updatedAt = now();
-  db.tasks.push(task);
   writeDb(db);
   return task;
 }
@@ -525,12 +543,15 @@ async function handleApi(request, response) {
   try {
     if (method === "GET" && requestUrl.pathname === "/api/tasks") return sendJson(response, 200, readDb().tasks);
     if (method === "GET" && requestUrl.pathname === "/api/status") {
+      const token = readConfig().pairingToken;
+      const lanAddress = getLanAddress();
       return sendJson(response, 200, {
         ok: true,
         dataDir,
         dbPath,
-        localUrl: null,
-        lanAddress: getLanAddress()
+        localUrl: "http://127.0.0.1:3737/",
+        lanAddress,
+        lanUrl: `http://${lanAddress}:3737/?token=${encodeURIComponent(token)}`
       });
     }
     if (method === "GET" && requestUrl.pathname === "/api/options") return sendJson(response, 200, readCliOptions());

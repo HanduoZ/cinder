@@ -46,6 +46,7 @@ body {
   font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   height: 100vh;
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 button,
@@ -147,6 +148,7 @@ h1 {
   background: rgba(24, 26, 32, 0.94);
   box-shadow: 0 24px 80px var(--shadow);
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .empty-state {
@@ -187,12 +189,9 @@ h1 {
 .task-meta {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   min-width: 0;
-}
-
-.task-meta-spacer {
-  flex: 1;
 }
 
 .deck-position {
@@ -267,11 +266,13 @@ pre {
 
 .answer-actions {
   position: absolute;
-  right: 12px;
+  left: 50%;
   bottom: 12px;
+  transform: translateX(-50%);
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center;
 }
 
 .log-panel pre {
@@ -363,7 +364,7 @@ pre {
 
 .composer-actions {
   position: absolute;
-  right: 36px;
+  right: 10px;
   bottom: 10px;
   display: flex;
   gap: 8px;
@@ -424,6 +425,18 @@ pre {
   border-color: var(--accent-2);
   color: #061b13;
   font-weight: 800;
+}
+
+.button.danger-outline {
+  background: transparent;
+  border-color: var(--accent);
+  color: #ff9a85;
+  font-weight: 800;
+}
+
+.button.danger-outline:hover {
+  border-color: #ff8a70;
+  background: rgba(255, 107, 74, 0.1);
 }
 
 .button.subtle {
@@ -532,23 +545,94 @@ select {
 }
 
 @media (max-width: 760px) {
-  .app-shell {
-    padding: 16px;
-  }
-
   body {
-    overflow: auto;
+    height: 100vh;
+    overflow: hidden;
   }
 
   .app-shell {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
+    height: 100vh;
+    min-height: 0;
+    padding: 12px;
+    gap: 10px;
+    overflow: hidden;
   }
 
-  .topbar,
-  .composer {
+  .topbar {
+    display: grid;
     grid-template-columns: 1fr;
+    align-items: start;
+    gap: 10px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .topbar p {
+    display: none;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat {
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .stat span {
+    font-size: 18px;
+  }
+
+  .stat small {
+    display: block;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .button.subtle {
+    padding: 8px;
+  }
+
+  .stage {
+    gap: 8px;
+  }
+
+  .review-card {
+    border-radius: 10px;
+  }
+
+  .task-view {
+    grid-template-rows: auto minmax(80px, 0.26fr) minmax(160px, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .panel h2 {
+    padding: 8px 10px 4px;
+    font-size: 12px;
+  }
+
+  pre {
+    padding: 0 10px 10px;
+    font-size: 12px;
+    line-height: 1.48;
+  }
+
+  .deck-button {
+    display: none;
+  }
+
+  .deck-position {
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .composer {
     display: grid;
   }
 
@@ -559,18 +643,27 @@ select {
   }
 
   .composer.drafting textarea {
-    padding: 12px;
+    padding: 10px 54px 44px 10px;
+  }
+
+  .input-shell textarea {
+    min-height: 78px;
+    height: 86px;
+    max-height: 126px;
+    resize: none;
+    padding: 10px 54px 10px 10px;
   }
 
   .composer-actions {
-    position: static;
-    margin-top: 8px;
-    flex-wrap: wrap;
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
   }
 
   .answer-actions {
     position: static;
-    justify-content: flex-end;
+    transform: none;
+    justify-content: center;
     padding: 0 12px 12px;
   }
 
@@ -579,6 +672,6 @@ select {
   }
 
   .topbar-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 }

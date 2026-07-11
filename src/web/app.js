@@ -4,8 +4,9 @@ const state = {
   draft: null,
   options: { providers: {} },
   taskOverrides: {},
-  view: "review",
-  indices: { running: 0, review: 0, done: 0 },
+  view: "active",
+  indices: { active: 0, suspended: 0, done: 0 },
+  currentIds: { active: null, suspended: null, done: null },
   pendingImages: [],
   processWindow: null,
   lang: window.localStorage.getItem("cinderLang") || ((navigator.language || "").startsWith("zh") ? "zh" : "en"),
@@ -15,17 +16,17 @@ const state = {
 const i18n = {
   en: {
     tagline: "Swipe through finished agent work.",
-    running: "running",
-    toJudge: "to judge",
+    active: "active",
+    suspended: "suspended",
     shipped: "shipped",
     settings: "Settings",
     done: "Done",
     language: "Language",
-    emptyRunningTitle: "No running cards",
-    emptyReviewTitle: "No cards to judge",
+    emptyActiveTitle: "No active cards",
+    emptySuspendedTitle: "No suspended cards",
     emptyDoneTitle: "No shipped cards",
-    emptyRunningDescription: "Running Claude Code and Codex tasks will show up here.",
-    emptyReviewDescription: "Finished results will land here.",
+    emptyActiveDescription: "Start a task or wait for agent work to come back.",
+    emptySuspendedDescription: "Swipe up on a card to suspend it.",
     emptyDoneDescription: "Cards you mark Done will show up here.",
     lastRequest: "Last request",
     answer: "Answer",
@@ -38,6 +39,8 @@ const i18n = {
     dropImages: "Drop images to attach",
     reviewPlaceholder: "Type a new request. Enter to send. Shift+Enter for newline.",
     runningPlaceholder: "Add a request to this running task. It will run after the current step finishes.",
+    activePlaceholder: "Type a follow-up. Enter to send. Shift+Enter for newline.",
+    suspendedPlaceholder: "Type to resume this suspended task.",
     draftPlaceholder: "Tell Cinder what to run. Enter to send. Shift+Enter for newline.",
     defaultModel: "default model",
     default: "default",
@@ -49,17 +52,17 @@ const i18n = {
   },
   zh: {
     tagline: "轻松审阅已完成的 AI 任务。",
-    running: "运行中",
-    toJudge: "待判断",
+    active: "进行中",
+    suspended: "挂起",
     shipped: "已通过",
     settings: "设置",
     done: "完成",
     language: "语言",
-    emptyRunningTitle: "没有运行中的卡片",
-    emptyReviewTitle: "没有待判断的卡片",
+    emptyActiveTitle: "没有进行中的卡片",
+    emptySuspendedTitle: "没有挂起的卡片",
     emptyDoneTitle: "没有已通过的卡片",
-    emptyRunningDescription: "运行中的 Claude Code 和 Codex 任务会显示在这里。",
-    emptyReviewDescription: "完成的结果会进入这里。",
+    emptyActiveDescription: "新开一个任务，或等待 agent 结果回来。",
+    emptySuspendedDescription: "上滑卡片后会进入这里。",
     emptyDoneDescription: "标记为通过的卡片会显示在这里。",
     lastRequest: "上次请求",
     answer: "答案",
@@ -72,6 +75,8 @@ const i18n = {
     dropImages: "拖放图片以上传",
     reviewPlaceholder: "输入新请求。Enter 发送，Shift+Enter 换行。",
     runningPlaceholder: "给这个运行中的任务追加需求。当前步骤结束后会自动继续。",
+    activePlaceholder: "输入后续需求。Enter 发送，Shift+Enter 换行。",
+    suspendedPlaceholder: "输入需求以恢复这个挂起任务。",
     draftPlaceholder: "告诉 Cinder 要运行什么。Enter 发送，Shift+Enter 换行。",
     defaultModel: "默认模型",
     default: "默认",
@@ -108,9 +113,6 @@ const els = {
   emptyState: document.getElementById("emptyState"),
   taskView: document.getElementById("taskView"),
   composer: document.getElementById("composer"),
-  providerBadge: document.getElementById("providerBadge"),
-  modelBadge: document.getElementById("modelBadge"),
-  cwdBadge: document.getElementById("cwdBadge"),
   previousCardButton: document.getElementById("previousCardButton"),
   deckPosition: document.getElementById("deckPosition"),
   nextCardButton: document.getElementById("nextCardButton"),
@@ -173,11 +175,13 @@ const cinder = {
 };
 
 function reviewQueue() {
-  return state.tasks.filter((task) => task.status === "review");
+  return state.tasks
+    .filter((task) => task.status === "running" || task.status === "review")
+    .sort(activeTaskSort);
 }
 
 function runningTasks() {
-  return state.tasks.filter((task) => task.status === "running");
+  return state.tasks.filter((task) => task.status === "suspended");
 }
 
 function shippedTasks() {
@@ -185,9 +189,17 @@ function shippedTasks() {
 }
 
 function queueForView(view = state.view) {
-  if (view === "running") return runningTasks();
+  if (view === "suspended") return runningTasks();
   if (view === "done") return shippedTasks();
   return reviewQueue();
+}
+
+function activeTaskSort(a, b) {
+  if (a.status !== b.status) {
+    if (a.status === "review") return -1;
+    if (b.status === "review") return 1;
+  }
+  return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
 }
 
 function clampIndex(view) {
@@ -196,21 +208,35 @@ function clampIndex(view) {
   state.indices[view] = Math.min(Math.max(0, state.indices[view] || 0), max);
 }
 
+function chooseCurrent(queue) {
+  const currentId = state.currentIds[state.view];
+  if (currentId) {
+    const index = queue.findIndex((task) => task.id === currentId);
+    if (index !== -1) {
+      state.indices[state.view] = index;
+      return queue[index];
+    }
+  }
+  const task = queue[state.indices[state.view]] || queue[0] || null;
+  state.currentIds[state.view] = task?.id || null;
+  return task;
+}
+
 function render() {
   const review = reviewQueue();
   const running = runningTasks();
   const shipped = shippedTasks();
-  clampIndex("running");
-  clampIndex("review");
+  clampIndex("suspended");
+  clampIndex("active");
   clampIndex("done");
   const activeQueue = queueForView();
-  state.current = state.draft ? null : activeQueue[state.indices[state.view]] || null;
+  state.current = state.draft ? null : chooseCurrent(activeQueue);
 
   els.runningCount.textContent = String(running.length);
   els.reviewCount.textContent = String(review.length);
   els.shippedCount.textContent = String(shipped.length);
-  els.runningStat.classList.toggle("active", state.view === "running" && !state.draft);
-  els.reviewStat.classList.toggle("active", state.view === "review" && !state.draft);
+  els.runningStat.classList.toggle("active", state.view === "suspended" && !state.draft);
+  els.reviewStat.classList.toggle("active", state.view === "active" && !state.draft);
   els.shippedStat.classList.toggle("active", state.view === "done" && !state.draft);
   els.stage.classList.toggle("drafting", Boolean(state.draft));
 
@@ -220,7 +246,7 @@ function render() {
   }
 
   if (!state.current) {
-    if (state.view === "review") {
+    if (state.view === "active") {
       openDraft({ renderNow: false });
       renderDraft();
       return;
@@ -236,7 +262,6 @@ function render() {
   }
 
   const task = state.current;
-  const selection = activeSelection();
   els.stage.classList.remove("drafting");
   els.emptyState.classList.add("hidden");
   els.reviewCard.classList.remove("hidden");
@@ -246,21 +271,22 @@ function render() {
   els.draftControls.classList.remove("hidden");
   renderDeckControls(activeQueue.length);
 
-  els.providerBadge.textContent = task.provider === "claude" ? "Claude Code" : "Codex CLI";
-  els.modelBadge.textContent = selection.model || providerOptions(task.provider).defaultModel || t("defaultModel");
-  els.cwdBadge.textContent = task.cwd || "";
   els.promptText.textContent = task.lastPrompt || "";
-  els.answerTitle.textContent = state.view === "running" ? t("process") : t("answer");
-  els.answerText.textContent = state.view === "running" ? task.log || "" : task.answer || "";
-  els.toggleLogButton.classList.toggle("hidden", state.view === "running");
+  els.answerTitle.textContent = task.status === "running" ? t("process") : t("answer");
+  els.answerText.textContent = task.status === "running" ? task.log || "" : task.answer || "";
+  els.toggleLogButton.classList.toggle("hidden", task.status === "running");
   updateProcessWindow();
-  if (state.view === "review" || state.view === "running") {
+  if (state.view === "active" || state.view === "suspended") {
     els.composer.classList.remove("hidden");
-    els.continueInput.placeholder = state.view === "running" ? t("runningPlaceholder") : t("reviewPlaceholder");
+    els.continueInput.placeholder = state.view === "suspended"
+      ? t("suspendedPlaceholder")
+      : task.status === "running"
+        ? t("runningPlaceholder")
+        : t("activePlaceholder");
     els.actionButton.setAttribute("aria-label", t("send"));
     els.actionButton.title = t("send");
-    els.answerActions.classList.toggle("hidden", state.view !== "review");
-    els.answerPanel.classList.toggle("has-actions", state.view === "review");
+    els.answerActions.classList.toggle("hidden", task.status !== "review" || state.view !== "active");
+    els.answerPanel.classList.toggle("has-actions", task.status === "review" && state.view === "active");
   } else {
     els.composer.classList.add("hidden");
     els.answerActions.classList.add("hidden");
@@ -275,13 +301,13 @@ function render() {
 
 function renderEmptyState() {
   const titles = {
-    running: t("emptyRunningTitle"),
-    review: t("emptyReviewTitle"),
+    suspended: t("emptySuspendedTitle"),
+    active: t("emptyActiveTitle"),
     done: t("emptyDoneTitle")
   };
   const descriptions = {
-    running: t("emptyRunningDescription"),
-    review: t("emptyReviewDescription"),
+    suspended: t("emptySuspendedDescription"),
+    active: t("emptyActiveDescription"),
     done: t("emptyDoneDescription")
   };
   els.emptyState.innerHTML = `<h2>${titles[state.view]}</h2><p>${descriptions[state.view]}</p>`;
@@ -321,7 +347,7 @@ function renderDraft() {
 async function refresh() {
   try {
     state.tasks = await cinder.listTasks();
-    if (state.draft && state.view === "review" && reviewQueue().length && !els.continueInput.value.trim() && !state.pendingImages.length) {
+    if (state.draft && state.view === "active" && reviewQueue().length && !els.continueInput.value.trim() && !state.pendingImages.length) {
       state.draft = null;
     }
     render();
@@ -342,7 +368,7 @@ async function refreshOptions() {
 }
 
 function openDraft({ renderNow = true } = {}) {
-  state.view = "review";
+  state.view = "active";
   state.draft = { ...defaultDraft(), prompt: "" };
   els.continueInput.value = "";
   state.pendingImages = [];
@@ -441,9 +467,9 @@ function resizeInput() {
 }
 
 function scrollRunningOutputToBottom() {
-  if (state.view !== "running" || !state.current) return;
+  if (state.current?.status !== "running") return;
   requestAnimationFrame(() => {
-    if (state.view !== "running" || !state.current) return;
+    if (state.current?.status !== "running") return;
     els.answerText.scrollTop = els.answerText.scrollHeight;
   });
 }
@@ -618,7 +644,7 @@ async function continueCurrent() {
     await startDraft();
     return;
   }
-  if (state.view !== "review" && state.view !== "running") return;
+  if (state.view !== "active" && state.view !== "suspended") return;
   const prompt = promptForSubmit();
   if (!state.current || (!prompt && !state.pendingImages.length)) return;
   const selection = activeSelection();
@@ -626,17 +652,21 @@ async function continueCurrent() {
   delete state.taskOverrides[state.current.id];
   els.continueInput.value = "";
   state.pendingImages = [];
+  state.currentIds[state.view] = null;
+  if (state.view === "suspended") state.view = "active";
   await refresh();
 }
 
 async function approveCurrent() {
-  if (state.view !== "review" || !state.current) return;
+  if (state.view !== "active" || state.current?.status !== "review") return;
+  state.currentIds.active = null;
   await cinder.completeTask(state.current.id);
   await refresh();
 }
 
 async function suspendCurrent() {
-  if (state.view !== "review" || !state.current) return;
+  if (state.view !== "active" || !state.current) return;
+  state.currentIds.active = null;
   await cinder.laterTask(state.current.id);
   await refresh();
 }
@@ -684,11 +714,12 @@ function moveDeck(delta) {
   const queue = queueForView();
   if (queue.length < 2) return;
   state.indices[state.view] = (state.indices[state.view] + delta + queue.length) % queue.length;
+  state.currentIds[state.view] = queue[state.indices[state.view]]?.id || null;
   render();
 }
 
-els.runningStat.addEventListener("click", () => switchView("running"));
-els.reviewStat.addEventListener("click", () => switchView("review"));
+els.runningStat.addEventListener("click", () => switchView("suspended"));
+els.reviewStat.addEventListener("click", () => switchView("active"));
 els.shippedStat.addEventListener("click", () => switchView("done"));
 els.previousCardButton.addEventListener("click", () => moveDeck(-1));
 els.nextCardButton.addEventListener("click", () => moveDeck(1));
@@ -702,7 +733,7 @@ els.draftModel.addEventListener("change", syncDraftFromControls);
 els.draftEffort.addEventListener("change", syncDraftFromControls);
 els.actionButton.addEventListener("click", continueCurrent);
 els.approveButton.addEventListener("click", approveCurrent);
-els.laterButton.addEventListener("click", suspendCurrent);
+els.laterButton?.addEventListener("click", suspendCurrent);
 els.toggleLogButton.addEventListener("click", openProcessWindow);
 els.continueInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
@@ -751,6 +782,35 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   suspendCurrent();
 });
+
+let touchStart = null;
+
+els.reviewCard.addEventListener("touchstart", (event) => {
+  if (!event.touches.length) return;
+  const touch = event.touches[0];
+  touchStart = {
+    x: touch.clientX,
+    y: touch.clientY,
+    time: Date.now()
+  };
+}, { passive: true });
+
+els.reviewCard.addEventListener("touchend", (event) => {
+  if (!touchStart || !event.changedTouches.length || state.draft) return;
+  const touch = event.changedTouches[0];
+  const dx = touch.clientX - touchStart.x;
+  const dy = touch.clientY - touchStart.y;
+  const elapsed = Date.now() - touchStart.time;
+  touchStart = null;
+  if (elapsed > 700) return;
+  if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+    moveDeck(dx < 0 ? 1 : -1);
+    return;
+  }
+  if (dy < -64 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+    suspendCurrent();
+  }
+}, { passive: true });
 
 applyTranslations();
 setInterval(refresh, 2000);
